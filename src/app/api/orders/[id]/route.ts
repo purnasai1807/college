@@ -10,7 +10,14 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     const { id } = await params
     const order = await prisma.order.findFirst({
       where: { id, userId: session.userId },
-      include: { items: { include: { food: { select: { prepMinutes: true } } } }, counter: true, canteen: true, slot: true, payment: true },
+      include: {
+        items: { include: { food: { select: { prepMinutes: true } } } },
+        counter: true,
+        canteen: true,
+        slot: true,
+        payment: true,
+        feedback: { select: { rating: true, comment: true, status: true, response: true } },
+      },
     })
     if (!order) throw new AppError('ORDER_NOT_FOUND', 'Order could not be found.', 404)
 
@@ -44,6 +51,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       counter: order.counter.name,
       slot: { startsAt: order.slot.startsAt, endsAt: order.slot.endsAt },
       items: order.items.map((i) => ({ name: i.name, qty: i.qty, unitPaise: i.unitPaise })),
+      feedback: order.feedback,
       queue,
       checkout: awaitingPayment
         ? { providerOrderId: order.payment!.providerOrderId, publicKey: process.env.PAYMENT_PROVIDER_KEY }

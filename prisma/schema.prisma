@@ -39,6 +39,12 @@ enum PaymentStatus {
   REFUND_FAILED
 }
 
+enum FeedbackStatus {
+  NEW
+  REVIEWED
+  RESOLVED
+}
+
 model Canteen {
   id       String       @id @default(cuid())
   name     String
@@ -54,6 +60,7 @@ model Canteen {
   slots    PickupSlot[]
   orders   Order[]
   users    User[]
+  feedback Feedback[]
 }
 
 model Campus {
@@ -90,6 +97,7 @@ model User {
   notifications Notification[]
   favorites     Favorite[]
   resets        PasswordReset[]
+  feedback      Feedback[]
 }
 
 model FoodItem {
@@ -150,6 +158,7 @@ model Order {
   items       OrderItem[]
   payment     Payment?
   pickupToken PickupToken?
+  feedback    Feedback?
 
   @@index([status, holdUntil])
   @@index([userId, createdAt])
@@ -269,4 +278,22 @@ model RealtimeEvent {
   createdAt DateTime @default(now())
 
   @@index([createdAt])
+}
+
+model Feedback {
+  id        String         @id @default(cuid())
+  userId    String
+  canteenId String
+  orderId   String         @unique
+  rating    Int
+  comment   String         @default("")
+  status    FeedbackStatus @default(NEW)
+  response  String?
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  user      User           @relation(fields: [userId], references: [id])
+  canteen   Canteen        @relation(fields: [canteenId], references: [id])
+  order     Order          @relation(fields: [orderId], references: [id])
+
+  @@index([canteenId, status, createdAt])
 }

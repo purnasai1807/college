@@ -5,6 +5,7 @@ A student-friendly canteen ordering application: browse the menu, reserve a pick
 ## What is included
 
 - Student menu search, categories, favorites, cart, checkout, order history, tracking, digital receipts, and in-app notifications.
+- Post-pickup order ratings and comments, with an admin review queue and student-visible canteen replies.
 - Password-based student/staff/admin sign-in, registration, password reset, signed HTTP-only sessions, role checks, and owner-scoped order access.
 - Multi-campus and multi-canteen student selection, with tenant-scoped admin, kitchen, pickup, and reporting operations.
 - Admin dashboard for menu and stock, counter/slot/staff management, canteen opening status, searchable kitchen orders, reports, settlement CSV export, refunds, and payment reconciliation.
@@ -65,6 +66,7 @@ Optional email-based password-reset links use Resend: set `RESEND_API_KEY` and `
 | Counter pickup | `/scan` | Scan QR or look up an order and verify collection |
 | Admin | `/admin` | Orders, menu, stock, counters, staff, settings, refunds |
 | Reports | `/admin/reports` | Sales, payment, item, and inventory summaries/CSV |
+| Order feedback | `/orders/[id]` | Rate a collected order and read the canteen's response |
 
 API route handlers live under `src/app/api`. Important flows include `/api/orders`, `/api/payments/webhook`, `/api/pickup/verify`, `/api/pickup/collect`, and the `/api/admin/*` endpoints. Student order reads are restricted to the signed-in user's own orders; kitchen and collection actions require the appropriate role. Collection is an atomic backend transition and cannot be repeated.
 
@@ -81,7 +83,7 @@ The app uses INR/Asia-Kolkata conventions for canteen slots and payment currency
 
 ## Test and build
 
-- `npm test` runs the pickup-token and webhook-signature tests; with `TEST_DATABASE_URL`, it also exercises PostgreSQL concurrency, tenant-isolation, and shared-rate-limit tests.
+- `npm test` runs the pickup-token and webhook-signature tests; with `TEST_DATABASE_URL`, it also exercises PostgreSQL concurrency, tenant-isolation, shared-rate-limit, and feedback tests.
 - Point `TEST_DATABASE_URL` only at a disposable PostgreSQL database. Never run integration tests against production data.
 - `npm run lint` runs the strict TypeScript check.
 - `npm run build` generates Prisma Client and builds Next.js.

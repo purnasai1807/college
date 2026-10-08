@@ -1,6 +1,6 @@
 'use client'
 import { useLive } from '@/lib/client/live'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import QRCode from 'qrcode'
 import { clock, inr } from '@/lib/client/format'
@@ -16,6 +16,7 @@ type Order = {
   items: { name: string; qty: number; unitPaise: number }[]
   checkout: { providerOrderId: string; publicKey: string } | null
   queue: { position: number; readyAt: string } | null
+  feedback: { rating: number; comment: string; status: string; response: string | null } | null
 }
 
 const STEPS = [
@@ -33,6 +34,10 @@ export default function OrderPage() {
   const [order, setOrder] = useState<Order | null>(null)
   const [qr, setQr] = useState('')
   const [error, setError] = useState('')
+  const [rating, setRating] = useState(5)
+  const [comment, setComment] = useState('')
+  const [feedbackMessage, setFeedbackMessage] = useState('')
+  const [sendingFeedback, setSendingFeedback] = useState(false)
 
   const load = useCallback(async () => {
     try {
@@ -68,6 +73,27 @@ export default function OrderPage() {
 
   const step = STEPS.findIndex(([s]) => s === order.status)
   const cancelled = order.status === 'CANCELLED'
+
+  async function submitFeedback(event: FormEvent) {
+    event.preventDefault()
+    setSendingFeedback(true)
+    setFeedbackMessage('')
+    try {
+      const response = await fetch(`/api/orders/${id}/feedback`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rating, comment }),
+      })
+      const json = await response.json()
+      if (!response.ok || !json.success) throw new Error(json.error?.message ?? 'Could not submit feedback.')
+      setOrder((current) => current ? { ...current, feedback: json.data } : current)
+      setFeedbackMessage('Thanks—your feedback was sent to the canteen.')
+    } catch (cause) {
+      setFeedbackMessage(cause instanceof Error ? cause.message : 'Could not submit feedback.')
+    } finally {
+      setSendingFeedback(false)
+    }
+  }
 
   return (
     <main className="mx-auto max-w-md px-5 py-8">
@@ -122,6 +148,35 @@ export default function OrderPage() {
           <li className="flex justify-between pt-3 font-semibold"><span>Total</span><span>{inr(order.totalPaise)}</span></li>
         </ul>
         {!cancelled && order.status !== 'PAYMENT_PENDING' && <a href={`/orders/${order.id}/receipt`} className="mt-4 block text-center text-sm text-amber-700 hover:underline">View receipt</a>}
+        {order.status === 'COLLECTED' && (
+          <section className="mt-6 border-t border-stone-100 pt-5">
+            <h2 className="font-semibold">Order feedback</h2>
+            {order.feedback ? (
+              <div className="mt-2 rounded-xl bg-emerald-50 p-4 text-sm text-emerald-900">
+                <p>{'★'.repeat(order.feedback.rating)}{'☆'.repeat(5 - order.feedback.rating)} · Feedback {order.feedback.status.toLowerCase()}</p>
+                {order.feedback.comment && <p className="mt-2 whitespace-pre-wrap">{order.feedback.comment}</p>}
+                {order.feedback.response && <p className="mt-3 border-t border-emerald-200 pt-3"><strong>Canteen response:</strong> {order.feedback.response}</p>}
+              </div>
+            ) : (
+              <form onSubmit={submitFeedback} className="mt-3 space-y-3">
+                <label className="block text-sm text-stone-600">
+                  Rating
+                  <select value={rating} onChange={(event) => setRating(Number(event.target.value))} className="ml-2 rounded-lg border border-stone-300 px-3 py-2">
+                    <option value={5}>5 · Excellent</option><option value={4}>4 · Good</option><option value={3}>3 · Okay</option><option value={2}>2 · Poor</option><option value={1}>1 · Very poor</option>
+                  </select>
+                </label>
+                <label className="block text-sm text-stone-600">
+                  Comments (optional)
+                  <textarea value={comment} onChange={(event) => setComment(event.target.value)} maxLength={1000} rows={3} className="mt-1 w-full rounded-lg border border-stone-300 px-3 py-2" />
+                </label>
+                <button disabled={sendingFeedback} className="rounded-xl bg-stone-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
+                  {sendingFeedback ? 'Sending…' : 'Send feedback'}
+                </button>
+                {feedbackMessage && <p role="status" className="text-sm text-stone-600">{feedbackMessage}</p>}
+              </form>
+            )}
+          </section>
+        )}
       </section>
     </main>
   )
