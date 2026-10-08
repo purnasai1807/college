@@ -9,6 +9,7 @@ A student-friendly canteen ordering application: browse the menu, reserve a pick
 - Password-based student/staff/admin sign-in, registration, password reset, signed HTTP-only sessions, role checks, and owner-scoped order access.
 - Multi-campus and multi-canteen student selection, with tenant-scoped admin, kitchen, pickup, and reporting operations.
 - Admin dashboard for menu and stock, counter/slot/staff management, canteen opening status, searchable kitchen orders, reports, settlement CSV export, refunds, and payment reconciliation.
+- Secure order recovery by student roll number or name for the last 72 hours, scoped to the admin's canteen and logged without storing the raw search term.
 - Kitchen order board with live updates and batched item totals; counter QR scanner with manual order-number lookup.
 - PostgreSQL/Prisma persistence, expiring inventory and slot reservations, order/payment state transitions, audit logs, and signed, single-use pickup tokens.
 - Razorpay payment-provider adapter, hosted checkout, signed webhook processing, idempotency, amount/currency checks, and provider-backed refunds.
@@ -66,6 +67,7 @@ Optional email-based password-reset links use Resend: set `RESEND_API_KEY` and `
 | Counter pickup | `/scan` | Scan QR or look up an order and verify collection |
 | Admin | `/admin` | Orders, menu, stock, counters, staff, settings, refunds |
 | Reports | `/admin/reports` | Sales, payment, item, and inventory summaries/CSV |
+| Recent order recovery | `/admin` | Find a student's canteen orders from the last 72 hours |
 | Order feedback | `/orders/[id]` | Rate a collected order and read the canteen's response |
 
 API route handlers live under `src/app/api`. Important flows include `/api/orders`, `/api/payments/webhook`, `/api/pickup/verify`, `/api/pickup/collect`, and the `/api/admin/*` endpoints. Student order reads are restricted to the signed-in user's own orders; kitchen and collection actions require the appropriate role. Collection is an atomic backend transition and cannot be repeated.
@@ -83,7 +85,7 @@ The app uses INR/Asia-Kolkata conventions for canteen slots and payment currency
 
 ## Test and build
 
-- `npm test` runs the pickup-token and webhook-signature tests; with `TEST_DATABASE_URL`, it also exercises PostgreSQL concurrency, tenant-isolation, shared-rate-limit, and feedback tests.
+- `npm test` runs the pickup-token and webhook-signature tests; with `TEST_DATABASE_URL`, it also exercises PostgreSQL concurrency, tenant isolation, shared rate limits, feedback, and recent order recovery.
 - Point `TEST_DATABASE_URL` only at a disposable PostgreSQL database. Never run integration tests against production data.
 - `npm run lint` runs the strict TypeScript check.
 - `npm run build` generates Prisma Client and builds Next.js.
@@ -96,5 +98,7 @@ The app uses INR/Asia-Kolkata conventions for canteen slots and payment currency
 4. Test with Razorpay test keys first. For live checkout, complete the provider's account/KYC process, configure live keys as secrets, and register the production HTTPS endpoint `/api/payments/webhook` for `payment.captured` and `refund.processed`.
 5. If menu image uploads are required, configure the `IMAGE_STORAGE_*` secrets, public bucket URL, and bucket CORS policy. Otherwise uploads remain explicitly unavailable while menu image URLs still work.
 6. Configure monitoring/alerts, database pool capacity for open SSE connections, and retention policies. Have students, kitchen staff, and counter staff test the full order, cancellation/refund, and pickup flow before opening orders.
+
+Order records are not automatically deleted by the application. Authorized canteen admins can search orders from the previous 72 hours by exact roll number or partial student name. Keep database backups and access controls configured by the hosting provider as additional disaster recovery; the in-app search window is not a replacement for backups.
 
 Do not deploy live payments without valid provider credentials and a verified public HTTPS webhook. Live payment/refund processing and camera scanning require the corresponding provider account, deployed endpoint, and browser/device and cannot be tested by CI alone.

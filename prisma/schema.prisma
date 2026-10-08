@@ -162,6 +162,7 @@ model Order {
 
   @@index([status, holdUntil])
   @@index([userId, createdAt])
+  @@index([canteenId, createdAt])
 }
 
 model OrderItem {

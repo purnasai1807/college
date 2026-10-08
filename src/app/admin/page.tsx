@@ -8,6 +8,7 @@ import { adminUrl } from '@/lib/client/admin-context'
 import ManagementPanel from '@/components/admin/management-panel'
 import ImageUploadField from '@/components/admin/image-upload-field'
 import FeedbackPanel from '@/components/admin/feedback-panel'
+import OrderRecoveryPanel from '@/components/admin/order-recovery-panel'
 
 type Data = {
   canteen: { name: string; isOpen: boolean }
@@ -205,6 +206,7 @@ export default function Admin() {
 
       <SetupForms counters={data.counters} canteenId={canteenId} onDone={load} />
       <ManagementPanel canteenId={canteenId} />
+      <OrderRecoveryPanel canteenId={canteenId} />
       <FeedbackPanel canteenId={canteenId} />
 
       <section className="mb-6 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-stone-100">
