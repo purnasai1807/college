@@ -1,0 +1,239 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  STUDENT
+  STAFF
+  KITCHEN
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum OrderStatus {
+  CREATED
+  PAYMENT_PENDING
+  PAID
+  ACCEPTED
+  PREPARING
+  READY
+  COLLECTED
+  CANCELLED
+  REFUND_PENDING
+  REFUNDED
+}
+
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  SUCCESS
+  FAILED
+  EXPIRED
+  REFUND_PENDING
+  REFUNDED
+  REFUND_FAILED
+}
+
+model Canteen {
+  id       String       @id @default(cuid())
+  name     String
+  isOpen   Boolean      @default(true)
+  collegeName       String @default("")
+  opensAt           String @default("08:00")
+  closesAt          String @default("18:00")
+  cancelAfterAccept Boolean @default(true)
+  counters Counter[]
+  foods    FoodItem[]
+  slots    PickupSlot[]
+  orders   Order[]
+}
+
+model Counter {
+  id        String  @id @default(cuid())
+  canteenId String
+  name      String
+  isOpen    Boolean @default(true)
+  canteen   Canteen @relation(fields: [canteenId], references: [id])
+  orders    Order[]
+}
+
+model User {
+  id            String         @id @default(cuid())
+  email         String         @unique
+  name          String
+  studentId     String?        @unique
+  passwordHash  String
+  role          Role           @default(STUDENT)
+  counterId     String?
+  createdAt     DateTime       @default(now())
+  orders        Order[]
+  notifications Notification[]
+  favorites     Favorite[]
+  resets        PasswordReset[]
+}
+
+model FoodItem {
+  id          String      @id @default(cuid())
+  canteenId   String
+  name        String
+  description String      @default("")
+  category    String      @default("Snacks")
+  pricePaise  Int
+  imageUrl    String?
+  stock       Int         @default(0)
+  reserved    Int         @default(0)
+  sold        Int         @default(0)
+  prepMinutes Int         @default(5)
+  isAvailable Boolean     @default(true)
+  canteen     Canteen     @relation(fields: [canteenId], references: [id])
+  orderItems  OrderItem[]
+  favorites   Favorite[]
+
+  @@index([canteenId, isAvailable])
+}
+
+model PickupSlot {
+  id        String   @id @default(cuid())
+  canteenId String
+  startsAt  DateTime
+  endsAt    DateTime
+  capacity  Int      @default(20)
+  booked    Int      @default(0)
+  canteen   Canteen  @relation(fields: [canteenId], references: [id])
+  orders    Order[]
+
+  @@index([canteenId, startsAt])
+}
+
+model OrderSeq {
+  day  String @id
+  last Int
+}
+
+model Order {
+  id          String       @id @default(cuid())
+  number      String       @unique
+  userId      String
+  canteenId   String
+  counterId   String
+  slotId      String
+  status      OrderStatus  @default(CREATED)
+  totalPaise  Int
+  holdUntil   DateTime
+  collectedAt DateTime?
+  createdAt   DateTime     @default(now())
+  user        User         @relation(fields: [userId], references: [id])
+  canteen     Canteen      @relation(fields: [canteenId], references: [id])
+  counter     Counter      @relation(fields: [counterId], references: [id])
+  slot        PickupSlot   @relation(fields: [slotId], references: [id])
+  items       OrderItem[]
+  payment     Payment?
+  pickupToken PickupToken?
+
+  @@index([status, holdUntil])
+  @@index([userId, createdAt])
+}
+
+model OrderItem {
+  id        String   @id @default(cuid())
+  orderId   String
+  foodId    String
+  name      String
+  unitPaise Int
+  qty       Int
+  order     Order    @relation(fields: [orderId], references: [id])
+  food      FoodItem @relation(fields: [foodId], references: [id])
+}
+
+model Payment {
+  id                String        @id @default(cuid())
+  orderId           String        @unique
+  provider          String
+  providerOrderId   String        @unique
+  providerPaymentId String?       @unique
+  amountPaise       Int
+  currency          String        @default("INR")
+  status            PaymentStatus @default(PENDING)
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  order             Order         @relation(fields: [orderId], references: [id])
+  refunds           Refund[]
+}
+
+model PaymentEvent {
+  id        String   @id
+  type      String
+  payload   Json
+  createdAt DateTime @default(now())
+}
+
+model PickupToken {
+  id            String    @id @default(cuid())
+  orderId       String    @unique
+  nonce         String    @unique
+  usedAt        DateTime?
+  invalidatedAt DateTime?
+  createdAt     DateTime  @default(now())
+  order         Order     @relation(fields: [orderId], references: [id])
+}
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  title     String
+  body      String
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id])
+
+  @@index([userId, createdAt])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  action     String
+  resource   String
+  resourceId String
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  @@index([resource, resourceId])
+}
+
+model Refund {
+  id               String   @id @default(cuid())
+  orderId          String
+  paymentId        String
+  amountPaise      Int
+  status           String   @default("PENDING")
+  providerRefundId String?  @unique
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  payment          Payment  @relation(fields: [paymentId], references: [id])
+
+  @@index([orderId])
+}
+
+model Favorite {
+  userId String
+  foodId String
+  user   User     @relation(fields: [userId], references: [id])
+  food   FoodItem @relation(fields: [foodId], references: [id])
+
+  @@id([userId, foodId])
+}
+
+model PasswordReset {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  user      User      @relation(fields: [userId], references: [id])
+}

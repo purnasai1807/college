@@ -1,0 +1,10 @@
+{
+  "name": "College Canteen",
+  "description": "Student-friendly online food ordering, UPI checkout, kitchen updates, and secure QR pickup.",
+  "capabilities": [
+    "STUDENT_ORDERING",
+    "CANTEEN_OPERATIONS",
+    "UPI_CHECKOUT",
+    "QR_PICKUP"
+  ]
+}
