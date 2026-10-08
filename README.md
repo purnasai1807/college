@@ -87,7 +87,7 @@ The app uses INR/Asia-Kolkata conventions for canteen slots and payment currency
 
 ## Test and build
 
-- `npm test` runs the pickup-token and webhook-signature tests; with `TEST_DATABASE_URL`, it also exercises PostgreSQL concurrency, tenant isolation, shared rate limits, feedback, and recent order recovery.
+- `npm test` runs the pickup-token and webhook-signature tests; with `TEST_DATABASE_URL`, it also verifies student credential checks, live menu data, server-priced checkout, payment confirmation, order status progression, PostgreSQL concurrency, tenant isolation, shared rate limits, feedback, and recent order recovery.
 - Point `TEST_DATABASE_URL` only at a disposable PostgreSQL database. Never run integration tests against production data.
 - `npm run lint` runs the strict TypeScript check.
 - `npm run build` generates Prisma Client and builds Next.js.

@@ -26,6 +26,7 @@ export default function Home() {
   const [selectedCanteenId, setSelectedCanteenId] = useState('')
   const [error, setError] = useState('')
   const [cart, setCart] = useState<Record<string, number>>({})
+  const [cartReady, setCartReady] = useState(false)
   const [query, setQuery] = useState('')
   const [category, setCategory] = useState('All')
   const [open, setOpen] = useState(false)
@@ -58,6 +59,7 @@ export default function Home() {
     setSelectedCanteenId(canteenId)
     setMenu(null)
     setCart({})
+    setCartReady(false)
     setCounterId('')
     setSlotId('')
     setError('')
@@ -93,19 +95,43 @@ export default function Home() {
 
   useEffect(() => {
     if (!menu) return
-    const raw = sessionStorage.getItem('cc_reorder')
-    if (!raw) return
-    sessionStorage.removeItem('cc_reorder')
-    const wanted: { foodId: string; qty: number }[] = JSON.parse(raw)
-    const next: Record<string, number> = {}
-    for (const w of wanted) {
-      const f = menu.foods.find((x) => x.id === w.foodId)
-      if (f && !f.soldOut) next[f.id] = w.qty
+    const reorder = sessionStorage.getItem('cc_reorder')
+    const key = `cc_cart:${menu.canteen.id}`
+    const stored = reorder ?? sessionStorage.getItem(key)
+    if (reorder) sessionStorage.removeItem('cc_reorder')
+    let next: Record<string, number> = {}
+    let incompleteReorder = false
+    if (stored) {
+      try {
+        const wanted: { foodId: string; qty: number }[] = reorder
+          ? JSON.parse(stored)
+          : Object.entries(JSON.parse(stored) as Record<string, number>).map(([foodId, qty]) => ({ foodId, qty }))
+        for (const item of wanted) {
+          const food = menu.foods.find((candidate) => candidate.id === item.foodId)
+          if (food && !food.soldOut && Number.isInteger(item.qty) && item.qty > 0 && item.qty <= 10) {
+            next[food.id] = item.qty
+          }
+        }
+        incompleteReorder = Boolean(reorder && Object.keys(next).length < wanted.length)
+      } catch {
+        sessionStorage.removeItem(key)
+        incompleteReorder = Boolean(reorder)
+      }
     }
     setCart(next)
-    if (Object.keys(next).length < wanted.length) setError('Some items from that order are no longer available, so they were left out.')
-    if (Object.keys(next).length) setOpen(true)
+    if (incompleteReorder) {
+      setError('Some items from that order are no longer available, so they were left out.')
+    }
+    setCartReady(true)
+    if (reorder && Object.keys(next).length) setOpen(true)
   }, [menu])
+
+  useEffect(() => {
+    if (!menu || !cartReady) return
+    const key = `cc_cart:${menu.canteen.id}`
+    if (Object.keys(cart).length) sessionStorage.setItem(key, JSON.stringify(cart))
+    else sessionStorage.removeItem(key)
+  }, [cart, cartReady, menu])
 
   async function toggleFav(id: string) {
     const res = await fetch('/api/favorites', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ foodId: id }) })
@@ -133,12 +159,18 @@ export default function Home() {
       const json = await res.json()
       if (!json.success) throw new Error(json.error.message)
       const d = json.data
-      await openCheckout({
-        key: d.publicKey,
-        orderId: d.providerOrderId,
-        amountPaise: d.amountPaise,
-        onClose: () => router.push(`/orders/${d.orderId}`),
-      })
+      setCart({})
+      setOpen(false)
+      try {
+        await openCheckout({
+          key: d.publicKey,
+          orderId: d.providerOrderId,
+          amountPaise: d.amountPaise,
+          onClose: () => router.push(`/orders/${d.orderId}`),
+        })
+      } catch {
+        router.push(`/orders/${d.orderId}`)
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Something went wrong. Please try again.')
     } finally {
