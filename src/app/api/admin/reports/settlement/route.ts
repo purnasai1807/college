@@ -41,7 +41,7 @@ export async function GET(req: Request) {
             { status: { in: ['REFUND_PENDING', 'REFUND_FAILED', 'REFUNDED'] }, updatedAt: { gte: from, lt: endExclusive } },
           ],
         },
-        select: { id: true, status: true, amountPaise: true, createdAt: true, capturedAt: true, order: { select: { number: true } } },
+        select: { id: true, status: true, amountPaise: true, createdAt: true, capturedAt: true, updatedAt: true, order: { select: { number: true } } },
         orderBy: { createdAt: 'asc' },
       }),
       prisma.refund.findMany({
@@ -73,7 +73,7 @@ export async function GET(req: Request) {
         ['record_type', 'order', 'status', 'amount_inr', 'event_at'].map(csvCell).join(','),
         ...payments.map((payment) => [
           'payment', payment.order.number, payment.status, (payment.amountPaise / 100).toFixed(2),
-          (payment.capturedAt ?? payment.createdAt).toISOString(),
+          (payment.status === 'SUCCESS' ? payment.capturedAt ?? payment.updatedAt : payment.status.startsWith('REFUND') ? payment.updatedAt : payment.createdAt).toISOString(),
         ].map(csvCell).join(',')),
         ...refunds.map((refund) => [
           'refund', refund.payment.order.number, refund.status, (refund.amountPaise / 100).toFixed(2),

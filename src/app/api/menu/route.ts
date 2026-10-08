@@ -9,11 +9,12 @@ export async function GET(req: Request) {
   try {
     void releaseExpired().catch(console.error)
     const canteenId = new URL(req.url).searchParams.get('canteenId')
+    const canteens = canteenId ? null : await prisma.canteen.findMany({ take: 2 })
     const canteen = canteenId
       ? await prisma.canteen.findUnique({ where: { id: canteenId } })
-      : (await prisma.canteen.findMany({ take: 2 }))[0]
+      : canteens?.[0]
     if (!canteen) throw new AppError('NO_CANTEEN', 'The canteen has not been set up yet.', 404)
-    if (!canteenId && (await prisma.canteen.count()) > 1) {
+    if (!canteenId && (canteens?.length ?? 0) > 1) {
       throw new AppError('CANTEEN_REQUIRED', 'Choose a canteen to view its menu.', 400)
     }
 
