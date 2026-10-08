@@ -54,7 +54,7 @@ export async function POST(req: Request) {
         succeeded: event.event === 'refund.processed',
       })
     }
-    publish()
+    await publish()
     return reply(200)
   } catch (e) {
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {

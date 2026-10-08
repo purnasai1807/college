@@ -5,11 +5,17 @@ import { withinHours } from '@/lib/hours'
 
 export const dynamic = 'force-dynamic'
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
     void releaseExpired().catch(console.error)
-    const canteen = await prisma.canteen.findFirst()
+    const canteenId = new URL(req.url).searchParams.get('canteenId')
+    const canteen = canteenId
+      ? await prisma.canteen.findUnique({ where: { id: canteenId } })
+      : (await prisma.canteen.findMany({ take: 2 }))[0]
     if (!canteen) throw new AppError('NO_CANTEEN', 'The canteen has not been set up yet.', 404)
+    if (!canteenId && (await prisma.canteen.count()) > 1) {
+      throw new AppError('CANTEEN_REQUIRED', 'Choose a canteen to view its menu.', 400)
+    }
 
     const [counters, foods, slots] = await Promise.all([
       prisma.counter.findMany({ where: { canteenId: canteen.id, isOpen: true }, select: { id: true, name: true } }),
@@ -18,7 +24,7 @@ export async function GET() {
         orderBy: { name: 'asc' },
       }),
       prisma.pickupSlot.findMany({
-        where: { canteenId: canteen.id, startsAt: { gt: new Date() } },
+        where: { canteenId: canteen.id, isOpen: true, startsAt: { gt: new Date() } },
         orderBy: { startsAt: 'asc' },
         take: 12,
       }),

@@ -1,9 +1,10 @@
 import { cookies } from 'next/headers'
 import { jwtVerify, SignJWT } from 'jose'
+import { prisma } from '../db'
 import { AppError } from '../http'
 
 export type Role = 'STUDENT' | 'STAFF' | 'KITCHEN' | 'ADMIN' | 'SUPER_ADMIN'
-export type Session = { userId: string; role: Role; counterId?: string }
+export type Session = { userId: string; role: Role; counterId?: string; canteenId?: string }
 
 const secret = () => {
   const value = process.env.AUTH_SECRET
@@ -18,7 +19,7 @@ export async function requireSession(...allowedRoles: Role[]): Promise<Session> 
   const token = (await cookies()).get('cc_session')?.value
   if (!token) throw new AppError('UNAUTHENTICATED', 'Please sign in to continue.', 401)
 
-  let session: Session
+  let userId: string
   try {
     const { payload } = await jwtVerify(token, secret())
     if (
@@ -28,13 +29,20 @@ export async function requireSession(...allowedRoles: Role[]): Promise<Session> 
     ) {
       throw new Error('Invalid session claims')
     }
-    session = {
-      userId: payload.userId,
-      role: payload.role as Role,
-      ...(typeof payload.counterId === 'string' ? { counterId: payload.counterId } : {}),
-    }
+    userId = payload.userId
   } catch {
     throw new AppError('SESSION_EXPIRED', 'Your session has expired. Please sign in again.', 401)
+  }
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, role: true, counterId: true, canteenId: true, enabled: true },
+  })
+  if (!user || !user.enabled) throw new AppError('SESSION_EXPIRED', 'Your session has expired. Please sign in again.', 401)
+  const session: Session = {
+    userId: user.id,
+    role: user.role,
+    ...(user.counterId ? { counterId: user.counterId } : {}),
+    ...(user.canteenId ? { canteenId: user.canteenId } : {}),
   }
   if (allowedRoles.length && !allowedRoles.includes(session.role)) {
     throw new AppError('FORBIDDEN', 'You are not allowed to do that.', 403)
@@ -42,8 +50,8 @@ export async function requireSession(...allowedRoles: Role[]): Promise<Session> 
   return session
 }
 
-export async function issueSession(user: { id: string; role: Role; counterId: string | null }) {
-  const token = await new SignJWT({ userId: user.id, role: user.role, counterId: user.counterId ?? undefined })
+export async function issueSession(user: { id: string; role: Role; counterId: string | null; canteenId?: string | null }) {
+  const token = await new SignJWT({ userId: user.id, role: user.role })
     .setProtectedHeader({ alg: 'HS256' })
     .setExpirationTime('7d')
     .sign(secret())

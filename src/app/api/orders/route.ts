@@ -15,7 +15,7 @@ const schema = z.object({
 
 export async function POST(req: Request) {
   try {
-    limit(req, 'checkout', 10)
+    await limit(req, 'checkout', 10)
     const session = await requireSession('STUDENT')
     const input = schema.parse(await req.json())
     const order = await createOrder(session.userId, input)

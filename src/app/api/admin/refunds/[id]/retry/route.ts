@@ -2,13 +2,15 @@ import { prisma } from '@/lib/db'
 import { AppError, fail, ok } from '@/lib/http'
 import { requireSession } from '@/lib/auth/session'
 import { sendRefund } from '@/lib/orders/refund'
+import { canteenForSession } from '@/lib/auth/canteen'
 
-export async function POST(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const admin = await requireSession('ADMIN', 'SUPER_ADMIN')
+    const canteenId = await canteenForSession(admin, new URL(req.url).searchParams.get('canteenId'))
     const { id } = await params
     const claimed = await prisma.$transaction(async (tx) => {
-      const result = await tx.refund.updateMany({ where: { id, status: 'FAILED' }, data: { status: 'PENDING' } })
+      const result = await tx.refund.updateMany({ where: { id, status: 'FAILED', payment: { order: { canteenId } } }, data: { status: 'PENDING' } })
       if (result.count) {
         const refund = await tx.refund.findUniqueOrThrow({ where: { id } })
         await tx.payment.update({ where: { id: refund.paymentId }, data: { status: 'REFUND_PENDING' } })

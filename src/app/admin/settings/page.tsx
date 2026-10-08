@@ -1,6 +1,7 @@
 'use client'
 import { FormEvent, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { adminUrl } from '@/lib/client/admin-context'
 
 type Settings = { name: string; collegeName: string; opensAt: string; closesAt: string; cancelAfterAccept: boolean }
 
@@ -12,7 +13,8 @@ export default function SettingsPage() {
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null)
 
   useEffect(() => {
-    fetch('/api/admin/settings').then(async (res) => {
+    const canteenId = new URLSearchParams(window.location.search).get('canteenId') ?? ''
+    fetch(adminUrl('/api/admin/settings', canteenId)).then(async (res) => {
       if (res.status === 401 || res.status === 403) return router.push('/login')
       const json = await res.json()
       if (json.success) setS(json.data)
@@ -21,7 +23,8 @@ export default function SettingsPage() {
 
   async function save(e: FormEvent) {
     e.preventDefault()
-    const res = await fetch('/api/admin/settings', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(s) })
+    const canteenId = new URLSearchParams(window.location.search).get('canteenId') ?? ''
+    const res = await fetch(adminUrl('/api/admin/settings', canteenId), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(s) })
     const json = await res.json()
     setMessage({ ok: json.success, text: json.success ? 'Settings saved.' : 'Check the values. Closing time must be after opening time.' })
   }
@@ -31,7 +34,7 @@ export default function SettingsPage() {
 
   return (
     <main className="mx-auto max-w-lg px-5 py-8">
-      <a href="/admin" className="text-sm text-stone-500 hover:text-stone-800">← Admin</a>
+      <a href={adminUrl('/admin', new URLSearchParams(typeof window === 'undefined' ? '' : window.location.search).get('canteenId') ?? '')} className="text-sm text-stone-500 hover:text-stone-800">← Admin</a>
       <h1 className="mb-5 mt-3 text-xl font-semibold">Canteen settings</h1>
       <form onSubmit={save} className="space-y-4 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-stone-100">
         <label className="block text-xs text-stone-500">College name<input className={box} value={s.collegeName} onChange={set('collegeName')} /></label>

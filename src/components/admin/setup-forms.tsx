@@ -1,5 +1,7 @@
 'use client'
 import { FormEvent, useState } from 'react'
+import { adminUrl } from '@/lib/client/admin-context'
+import ImageUploadField from './image-upload-field'
 
 type Field = [key: string, label: string, type?: string]
 
@@ -12,7 +14,7 @@ const FORMS: Record<string, { title: string; fields: Field[] }> = {
 
 const input = 'w-full rounded-lg border border-stone-300 px-3 py-2 text-sm outline-none focus:border-amber-500'
 
-export default function SetupForms({ counters, onDone }: { counters: { id: string; name: string }[]; onDone: () => void }) {
+export default function SetupForms({ counters, canteenId, onDone }: { counters: { id: string; name: string }[]; canteenId: string; onDone: () => void }) {
   const [kind, setKind] = useState('food')
   const [values, setValues] = useState<Record<string, string>>({})
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null)
@@ -26,7 +28,7 @@ export default function SetupForms({ counters, onDone }: { counters: { id: strin
       if (key === 'price') body.pricePaise = Math.round(Number(v) * 100)
       else body[key] = type === 'number' ? Number(v) : v
     }
-    const res = await fetch('/api/admin/setup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+    const res = await fetch(adminUrl('/api/admin/setup', canteenId), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
     const json = await res.json()
     if (json.success) { setValues({}); onDone() }
     setMessage({ ok: json.success, text: json.success ? 'Saved.' : json.error.message })
@@ -52,6 +54,12 @@ export default function SetupForms({ counters, onDone }: { counters: { id: strin
               <select className={input} value={values.counterId ?? ''} onChange={(e) => setValues({ ...values, counterId: e.target.value })}>
                 <option value="">None</option>{counters.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
+            ) : key === 'imageUrl' ? (
+              <ImageUploadField
+                canteenId={canteenId}
+                value={values.imageUrl ?? ''}
+                onChange={(imageUrl) => setValues({ ...values, imageUrl })}
+              />
             ) : (
               <input className={input} type={type ?? 'text'} value={values[key] ?? ''} onChange={(e) => setValues({ ...values, [key]: e.target.value })} required={key !== 'description'} />
             )}

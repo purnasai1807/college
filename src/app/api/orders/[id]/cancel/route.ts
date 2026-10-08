@@ -8,7 +8,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     const session = await requireSession('STUDENT')
     const { id } = await params
     const done = await cancelOrder(session.userId, id)
-    publish()
+    await publish()
     return ok(done)
   } catch (e) {
     return fail(e)

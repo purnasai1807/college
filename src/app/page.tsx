@@ -6,6 +6,7 @@ import { openCheckout } from '@/lib/client/razorpay'
 
 type Food = { id: string; name: string; description: string; category: string; pricePaise: number; imageUrl: string | null; prepMinutes: number; soldOut: boolean }
 type Slot = { id: string; startsAt: string; endsAt: string; left: number }
+type CanteenOption = { id: string; name: string; collegeName: string; campus: { name: string } }
 type Menu = {
   canteen: { id: string; name: string; collegeName: string; isOpen: boolean }
   counters: { id: string; name: string }[]
@@ -21,6 +22,8 @@ const greeting = () => {
 export default function Home() {
   const router = useRouter()
   const [menu, setMenu] = useState<Menu | null>(null)
+  const [canteens, setCanteens] = useState<CanteenOption[]>([])
+  const [selectedCanteenId, setSelectedCanteenId] = useState('')
   const [error, setError] = useState('')
   const [cart, setCart] = useState<Record<string, number>>({})
   const [query, setQuery] = useState('')
@@ -31,12 +34,39 @@ export default function Home() {
   const [paying, setPaying] = useState(false)
   const [favs, setFavs] = useState<string[]>([])
 
+  async function loadMenu(canteenId: string) {
+    const response = await fetch(`/api/menu?canteenId=${encodeURIComponent(canteenId)}`)
+    const json = await response.json()
+    if (!json.success) throw new Error(json.error.message)
+    setMenu(json.data)
+  }
+
   useEffect(() => {
-    fetch('/api/menu')
+    fetch('/api/canteens')
       .then((r) => r.json())
-      .then((j) => (j.success ? setMenu(j.data) : setError(j.error.message)))
-      .catch(() => setError('Could not load the menu. Check your connection.'))
+      .then(async (json) => {
+        if (!json.success) throw new Error(json.error.message)
+        setCanteens(json.data)
+        if (!json.data.length) throw new Error('No canteens are available yet.')
+        setSelectedCanteenId(json.data[0].id)
+        await loadMenu(json.data[0].id)
+      })
+      .catch((e) => setError(e instanceof Error ? e.message : 'Could not load the menu. Check your connection.'))
   }, [])
+
+  async function changeCanteen(canteenId: string) {
+    setSelectedCanteenId(canteenId)
+    setMenu(null)
+    setCart({})
+    setCounterId('')
+    setSlotId('')
+    setError('')
+    try {
+      await loadMenu(canteenId)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not load the menu.')
+    }
+  }
 
   const categories = useMemo(() => ['All', 'Favorites', ...new Set(menu?.foods.map((f) => f.category) ?? [])], [menu])
   const shown = menu?.foods.filter(
@@ -139,6 +169,23 @@ export default function Home() {
             {closed ? 'Closed' : 'Open'}
           </span>
         </div>
+        {canteens.length > 1 && (
+          <label className="mt-3 block text-sm text-stone-600">
+            Canteen
+            <select
+              value={selectedCanteenId}
+              onChange={(e) => void changeCanteen(e.target.value)}
+              className="ml-2 rounded-lg border border-stone-300 bg-white px-3 py-2"
+              aria-label="Choose a canteen"
+            >
+              {canteens.map((canteen) => (
+                <option key={canteen.id} value={canteen.id}>
+                  {canteen.campus.name} · {canteen.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <a href="/orders" className="mt-2 inline-block text-sm text-amber-700 hover:underline">My orders</a>
         <a href="/notifications" className="ml-4 mt-2 inline-block text-sm text-amber-700 hover:underline">Notifications</a>
         <a href="/profile" className="ml-4 mt-2 inline-block text-sm text-amber-700 hover:underline">Profile</a>

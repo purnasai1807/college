@@ -9,11 +9,11 @@ const schema = z.object({ email: z.string().trim().toLowerCase().email(), passwo
 
 export async function POST(req: Request) {
   try {
-    limit(req, 'login', 10)
+    await limit(req, 'login', 10)
     const { email, password } = schema.parse(await req.json())
     const user = await prisma.user.findUnique({ where: { email } })
     const good = user ? await bcrypt.compare(password, user.passwordHash) : false
-    if (!user || !good) throw new AppError('INVALID_CREDENTIALS', 'Email or password is incorrect.', 401)
+    if (!user || !good || !user.enabled) throw new AppError('INVALID_CREDENTIALS', 'Email or password is incorrect.', 401)
     await issueSession(user)
     return ok({ id: user.id, name: user.name, role: user.role })
   } catch (e) {

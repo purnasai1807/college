@@ -76,7 +76,7 @@ export async function completeRefund(input: {
     const nextStatus = input.succeeded ? 'SUCCESS' : 'FAILED'
     const updated = await tx.refund.updateMany({
       where: { id: refund.id, status: { in: ['PENDING', 'PROCESSING'] } },
-      data: { status: nextStatus },
+      data: { status: nextStatus, resolvedAt: new Date() },
     })
     if (updated.count === 0) return
 

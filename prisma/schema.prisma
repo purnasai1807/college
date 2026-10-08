@@ -44,13 +44,25 @@ model Canteen {
   name     String
   isOpen   Boolean      @default(true)
   collegeName       String @default("")
+  campusId          String @default("default-campus")
   opensAt           String @default("08:00")
   closesAt          String @default("18:00")
   cancelAfterAccept Boolean @default(true)
+  campus   Campus     @relation(fields: [campusId], references: [id])
   counters Counter[]
   foods    FoodItem[]
   slots    PickupSlot[]
   orders   Order[]
+  users    User[]
+}
+
+model Campus {
+  id       String    @id @default(cuid())
+  name     String
+  location String    @default("")
+  canteens Canteen[]
+
+  @@unique([name, location])
 }
 
 model Counter {
@@ -70,7 +82,10 @@ model User {
   passwordHash  String
   role          Role           @default(STUDENT)
   counterId     String?
+  canteenId     String?
+  enabled       Boolean        @default(true)
   createdAt     DateTime       @default(now())
+  canteen       Canteen?       @relation(fields: [canteenId], references: [id])
   orders        Order[]
   notifications Notification[]
   favorites     Favorite[]
@@ -104,6 +119,7 @@ model PickupSlot {
   endsAt    DateTime
   capacity  Int      @default(20)
   booked    Int      @default(0)
+  isOpen    Boolean  @default(true)
   canteen   Canteen  @relation(fields: [canteenId], references: [id])
   orders    Order[]
 
@@ -159,6 +175,7 @@ model Payment {
   amountPaise       Int
   currency          String        @default("INR")
   status            PaymentStatus @default(PENDING)
+  capturedAt        DateTime?
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
   order             Order         @relation(fields: [orderId], references: [id])
@@ -213,6 +230,7 @@ model Refund {
   amountPaise      Int
   status           String   @default("PENDING")
   providerRefundId String?  @unique
+  resolvedAt       DateTime?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
   payment          Payment  @relation(fields: [paymentId], references: [id])
@@ -236,4 +254,19 @@ model PasswordReset {
   expiresAt DateTime
   usedAt    DateTime?
   user      User      @relation(fields: [userId], references: [id])
+}
+
+model RateLimitBucket {
+  key             String   @id
+  windowStartedAt DateTime
+  hits            Int      @default(0)
+
+  @@index([windowStartedAt])
+}
+
+model RealtimeEvent {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
 }

@@ -7,7 +7,7 @@ import { sendMail } from '@/lib/mail'
 
 export async function POST(req: Request) {
   try {
-    limit(req, 'forgot', 5)
+    await limit(req, 'forgot', 5)
     if (process.env.NODE_ENV === 'production' && !process.env.RESEND_API_KEY) {
       throw new AppError('EMAIL_NOT_CONFIGURED', 'Password reset is temporarily unavailable.', 503)
     }

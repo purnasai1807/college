@@ -65,4 +65,16 @@ describe.skipIf(!url)('checkout under concurrent load', () => {
     expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1)
     expect((await prisma.pickupSlot.findUniqueOrThrow({ where: { id: slot.id } })).booked).toBe(1)
   })
+
+  it('rejects a counter belonging to a different canteen', async () => {
+    const { createOrder } = await import('../src/lib/orders/service')
+    const { prisma, users, order } = await setup(3, 10)
+    const otherCanteen = await prisma.canteen.create({ data: { name: `Other tenant ${Date.now()}` } })
+    canteenIds.push(otherCanteen.id)
+    const foreignCounter = await prisma.counter.create({ data: { name: 'Foreign', canteenId: otherCanteen.id } })
+    const request = order(users[0].id)
+
+    await expect(createOrder(request.userId, { ...request.input, counterId: foreignCounter.id }))
+      .rejects.toMatchObject({ code: 'COUNTER_UNAVAILABLE' })
+  })
 })

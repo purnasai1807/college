@@ -1,40 +1,42 @@
 import { prisma } from '@/lib/db'
 import { fail, ok } from '@/lib/http'
 import { requireSession } from '@/lib/auth/session'
+import { canteenForSession } from '@/lib/auth/canteen'
 
 export const dynamic = 'force-dynamic'
 
 const REVENUE = ['PAID', 'ACCEPTED', 'PREPARING', 'READY', 'COLLECTED'] as const
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
-    await requireSession('ADMIN', 'SUPER_ADMIN')
+    const admin = await requireSession('ADMIN', 'SUPER_ADMIN')
+    const canteenId = await canteenForSession(admin, new URL(req.url).searchParams.get('canteenId'))
     const day = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })
     const since = new Date(`${day}T00:00:00+05:30`)
 
     const [canteen, byStatus, revenue, refunded, recent, foods, unpaid, orphaned] = await Promise.all([
-      prisma.canteen.findFirstOrThrow(),
-      prisma.order.groupBy({ by: ['status'], where: { createdAt: { gte: since } }, _count: true }),
-      prisma.order.aggregate({ where: { createdAt: { gte: since }, status: { in: [...REVENUE] } }, _sum: { totalPaise: true } }),
-      prisma.refund.aggregate({ where: { createdAt: { gte: since }, status: 'SUCCESS' }, _sum: { amountPaise: true } }),
-      prisma.order.findMany({ orderBy: { createdAt: 'desc' }, take: 25, include: { user: { select: { name: true } }, counter: true } }),
-      prisma.foodItem.findMany({ orderBy: { name: 'asc' } }),
+      prisma.canteen.findUniqueOrThrow({ where: { id: canteenId } }),
+      prisma.order.groupBy({ by: ['status'], where: { canteenId, createdAt: { gte: since } }, _count: true }),
+      prisma.order.aggregate({ where: { canteenId, createdAt: { gte: since }, status: { in: [...REVENUE] } }, _sum: { totalPaise: true } }),
+      prisma.refund.aggregate({ where: { createdAt: { gte: since }, status: 'SUCCESS', payment: { order: { canteenId } } }, _sum: { amountPaise: true } }),
+      prisma.order.findMany({ where: { canteenId }, orderBy: { createdAt: 'desc' }, take: 25, include: { user: { select: { name: true } }, counter: true } }),
+      prisma.foodItem.findMany({ where: { canteenId }, orderBy: { name: 'asc' } }),
       // paid-looking orders with no successful payment behind them
       prisma.order.findMany({
-        where: { status: { in: [...REVENUE] }, NOT: { payment: { is: { status: 'SUCCESS' } } } },
+        where: { canteenId, status: { in: [...REVENUE] }, NOT: { payment: { is: { status: 'SUCCESS' } } } },
         select: { id: true, number: true, status: true },
         take: 50,
       }),
       // successful payments whose order never became paid
       prisma.payment.findMany({
-        where: { status: 'SUCCESS', order: { status: { in: ['CREATED', 'PAYMENT_PENDING', 'CANCELLED'] } } },
+        where: { status: 'SUCCESS', order: { canteenId, status: { in: ['CREATED', 'PAYMENT_PENDING', 'CANCELLED'] } } },
         select: { id: true, amountPaise: true, order: { select: { number: true, status: true } } },
         take: 50,
       }),
     ])
 
-    const failedRefunds = await prisma.refund.findMany({ where: { status: 'FAILED' }, select: { id: true, orderId: true, amountPaise: true } })
-    const counters = await prisma.counter.findMany({ select: { id: true, name: true } })
+    const failedRefunds = await prisma.refund.findMany({ where: { status: 'FAILED', payment: { order: { canteenId } } }, select: { id: true, orderId: true, amountPaise: true } })
+    const counters = await prisma.counter.findMany({ where: { canteenId }, select: { id: true, name: true } })
 
     const count = (...s: string[]) => byStatus.filter((r) => s.includes(r.status)).reduce((n, r) => n + r._count, 0)
     return ok({

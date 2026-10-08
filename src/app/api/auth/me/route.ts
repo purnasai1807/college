@@ -16,7 +16,7 @@ export async function GET() {
     const s = await requireSession()
     const user = await prisma.user.findUnique({ where: { id: s.userId } })
     if (!user) throw new AppError('UNAUTHENTICATED', 'Please sign in to continue.', 401)
-    return ok({ id: user.id, name: user.name, email: user.email, studentId: user.studentId, role: user.role })
+    return ok({ id: user.id, name: user.name, email: user.email, studentId: user.studentId, role: user.role, canteenId: user.canteenId })
   } catch (e) {
     return fail(e)
   }

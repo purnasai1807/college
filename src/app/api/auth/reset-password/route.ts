@@ -9,7 +9,7 @@ const schema = z.object({ token: z.string().length(64), password: z.string().min
 
 export async function POST(req: Request) {
   try {
-    limit(req, 'reset', 10)
+    await limit(req, 'reset', 10)
     const { token, password } = schema.parse(await req.json())
     const reset = await prisma.passwordReset.findUnique({ where: { tokenHash: createHash('sha256').update(token).digest('hex') } })
     if (!reset || reset.usedAt || reset.expiresAt < new Date()) {

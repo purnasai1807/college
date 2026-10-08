@@ -6,7 +6,8 @@ A student-friendly canteen ordering application: browse the menu, reserve a pick
 
 - Student menu search, categories, favorites, cart, checkout, order history, tracking, digital receipts, and in-app notifications.
 - Password-based student/staff/admin sign-in, registration, password reset, signed HTTP-only sessions, role checks, and owner-scoped order access.
-- Admin dashboard for menu and stock, counters, pickup-slot setup, canteen opening status, staff accounts, reports, CSV export, refunds, and payment reconciliation.
+- Multi-campus and multi-canteen student selection, with tenant-scoped admin, kitchen, pickup, and reporting operations.
+- Admin dashboard for menu and stock, counter/slot/staff management, canteen opening status, searchable kitchen orders, reports, settlement CSV export, refunds, and payment reconciliation.
 - Kitchen order board with live updates and batched item totals; counter QR scanner with manual order-number lookup.
 - PostgreSQL/Prisma persistence, expiring inventory and slot reservations, order/payment state transitions, audit logs, and signed, single-use pickup tokens.
 - Razorpay payment-provider adapter, hosted checkout, signed webhook processing, idempotency, amount/currency checks, and provider-backed refunds.
@@ -47,7 +48,9 @@ Do not put provider secrets in `NEXT_PUBLIC_*` variables or the browser. Checkou
 
 ## Database and account setup
 
-`prisma/schema.prisma` defines canteens, counters, users/roles, food, inventory quantities, pickup slots, orders, payments, webhook events, QR tokens, notifications, audit logs, refunds, favorites, and password resets. The initial PostgreSQL migration is in `prisma/migrations`. For local schema iteration, use `npm run db:push`; for deployment, use `npm run db:migrate` (`prisma migrate deploy`).
+`prisma/schema.prisma` defines campuses/canteens, counters, tenant-assigned users, food, inventory quantities, pickup slots, orders, payments, webhook events, QR tokens, notifications, audit logs, refunds, favorites, password resets, shared rate-limit buckets, and realtime events. Migrations are in `prisma/migrations`. For local schema iteration, use `npm run db:push`; for deployment, use `npm run db:migrate` (`prisma migrate deploy`).
+
+Rate limiting and realtime invalidation use PostgreSQL so separate app instances share the same state. Realtime delivery polls the shared event table while an SSE connection is open; keep the database connection pool sized for the expected number of concurrent streams. Food image upload is optional and uses an S3-compatible bucket: configure the `IMAGE_STORAGE_*` variables, allow browser POST uploads from the app origin in the bucket CORS policy, and serve uploaded keys from `IMAGE_STORAGE_PUBLIC_URL`. For AWS, prefer the deployment's workload identity rather than static access keys. Uploads are restricted to JPEG, PNG, and WebP files up to 5 MB.
 
 Optional email-based password-reset links use Resend: set `RESEND_API_KEY` and `MAIL_FROM`. Without an email provider, the application reports that reset email is unavailable; reset links are not exposed as successful email delivery.
 
@@ -83,4 +86,4 @@ The app uses INR/Asia-Kolkata conventions for canteen slots and payment currency
 - `npm run lint` runs the strict TypeScript check.
 - `npm run build` generates Prisma Client and builds Next.js.
 
-Production rollout additionally requires verified live provider credentials/webhook delivery, HTTPS, managed PostgreSQL backups, database access controls, monitoring, rate-limit coordination for multiple instances, and operational acceptance testing with canteen staff. Live payment/refund and camera permissions cannot be exercised without the provider account, public HTTPS endpoint, and a browser/device.
+Production rollout additionally requires verified live provider credentials/webhook delivery, HTTPS, managed PostgreSQL backups, database access controls, monitoring, correctly sized PostgreSQL connection pools, configured image storage (if uploads are needed), and operational acceptance testing with canteen staff. Live payment/refund and camera permissions cannot be exercised without the provider account, public HTTPS endpoint, and a browser/device.

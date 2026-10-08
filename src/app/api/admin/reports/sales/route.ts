@@ -1,13 +1,15 @@
 import { prisma } from '@/lib/db'
 import { fail } from '@/lib/http'
 import { requireSession } from '@/lib/auth/session'
+import { canteenForSession } from '@/lib/auth/canteen'
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
-    await requireSession('ADMIN', 'SUPER_ADMIN')
+    const admin = await requireSession('ADMIN', 'SUPER_ADMIN')
+    const canteenId = await canteenForSession(admin, new URL(req.url).searchParams.get('canteenId'))
     const day = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })
     const orders = await prisma.order.findMany({
-      where: { createdAt: { gte: new Date(`${day}T00:00:00+05:30`) } },
+      where: { canteenId, createdAt: { gte: new Date(`${day}T00:00:00+05:30`) } },
       orderBy: { createdAt: 'asc' },
       include: { counter: true },
     })

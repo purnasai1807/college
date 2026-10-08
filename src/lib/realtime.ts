@@ -1,12 +1,12 @@
-// One process only. If you run several app instances, replace this with Redis pub/sub.
-type Listener = () => void
-const g = globalThis as unknown as { ccListeners?: Set<Listener> }
-const listeners = (g.ccListeners ??= new Set<Listener>())
+import { prisma } from './db'
 
-export const subscribe = (fn: Listener) => {
-  listeners.add(fn)
-  return () => void listeners.delete(fn)
+let lastSweepAt = 0
+
+export async function publish() {
+  const now = Date.now()
+  await prisma.realtimeEvent.create({ data: {} })
+  if (now - lastSweepAt > 3_600_000) {
+    await prisma.realtimeEvent.deleteMany({ where: { createdAt: { lt: new Date(now - 86_400_000) } } })
+    lastSweepAt = now
+  }
 }
-
-// Carries no data on purpose: clients just refetch what they are allowed to see.
-export const publish = () => listeners.forEach((fn) => fn())

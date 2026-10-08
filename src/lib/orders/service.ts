@@ -64,7 +64,7 @@ export async function createOrder(userId: string, input: NewOrder) {
     const slotTaken = await tx.$executeRaw`
       UPDATE "PickupSlot" SET booked = booked + 1
       WHERE id = ${input.slotId} AND "canteenId" = ${canteen.id}
-        AND booked < capacity AND "startsAt" > now()`
+        AND "isOpen" = true AND booked < capacity AND "startsAt" > now()`
     if (slotTaken === 0) throw new AppError('SLOT_FULL', 'That pickup slot is full.', 409)
 
     return tx.order.create({
@@ -165,7 +165,7 @@ export async function confirmPayment(ev: PaymentEventInput) {
           if (refundPending.count) {
             await tx.payment.update({
               where: { id: payment.id },
-              data: { status: 'REFUND_PENDING', providerPaymentId: ev.providerPaymentId },
+              data: { status: 'REFUND_PENDING', providerPaymentId: ev.providerPaymentId, capturedAt: new Date() },
             })
             const refund = await tx.refund.create({
               data: { orderId: order.id, paymentId: payment.id, amountPaise: payment.amountPaise },
@@ -185,7 +185,7 @@ export async function confirmPayment(ev: PaymentEventInput) {
         }
         await tx.payment.update({
           where: { id: payment.id },
-          data: { status: 'SUCCESS', providerPaymentId: ev.providerPaymentId },
+          data: { status: 'SUCCESS', providerPaymentId: ev.providerPaymentId, capturedAt: new Date() },
         })
         await tx.auditLog.create({
           data: { action: 'PAYMENT_ON_CLOSED_ORDER', resource: 'payment', resourceId: payment.id },
@@ -195,7 +195,7 @@ export async function confirmPayment(ev: PaymentEventInput) {
 
       await tx.payment.update({
         where: { id: payment.id },
-        data: { status: 'SUCCESS', providerPaymentId: ev.providerPaymentId },
+        data: { status: 'SUCCESS', providerPaymentId: ev.providerPaymentId, capturedAt: new Date() },
       })
       const order = await tx.order.findUniqueOrThrow({
         where: { id: payment.orderId },
@@ -262,10 +262,11 @@ const NEXT_STEP = {
   READY: 'PREPARING',
 } as const
 
-export async function advanceOrder(actorId: string, orderId: string, to: keyof typeof NEXT_STEP) {
+export async function advanceOrder(actor: { userId: string; canteenId?: string; counterId?: string }, orderId: string, to: keyof typeof NEXT_STEP) {
+  if (!actor.canteenId) throw new AppError('CANTEEN_REQUIRED', 'Your account is not assigned to a canteen.', 409)
   return prisma.$transaction(async (tx) => {
     const moved = await tx.order.updateMany({
-      where: { id: orderId, status: NEXT_STEP[to] },
+      where: { id: orderId, canteenId: actor.canteenId, ...(actor.counterId ? { counterId: actor.counterId } : {}), status: NEXT_STEP[to] },
       data: { status: to },
     })
     if (moved.count === 0) {
@@ -273,7 +274,7 @@ export async function advanceOrder(actorId: string, orderId: string, to: keyof t
     }
     const order = await tx.order.findUniqueOrThrow({ where: { id: orderId } })
     await tx.auditLog.create({
-      data: { userId: actorId, action: `ORDER_${to}`, resource: 'order', resourceId: orderId },
+      data: { userId: actor.userId, action: `ORDER_${to}`, resource: 'order', resourceId: orderId },
     })
     if (to === 'READY') {
       await tx.notification.create({
@@ -288,7 +289,7 @@ export async function advanceOrder(actorId: string, orderId: string, to: keyof t
   })
 }
 
-type Staff = { userId: string; role: string; counterId?: string }
+type Staff = { userId: string; role: string; canteenId?: string; counterId?: string }
 
 export async function checkPickup(db: Tx | typeof prisma, staff: Staff, rawToken: string) {
   const invalid = () => new AppError('INVALID_QR', 'This QR code could not be verified.', 400)
@@ -306,6 +307,9 @@ export async function checkPickup(db: Tx | typeof prisma, staff: Staff, rawToken
   if (!token || token.orderId !== parsed.orderId) throw invalid()
 
   const order = token.order
+  if (!staff.canteenId || staff.canteenId !== order.canteenId) {
+    throw new AppError('FORBIDDEN', 'This order belongs to a different canteen.', 403)
+  }
   if (order.payment?.status !== 'SUCCESS') {
     throw new AppError('PAYMENT_NOT_CONFIRMED', 'Payment has not been confirmed for this order.', 409)
   }

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { clock } from '@/lib/client/format'
 
 type Order = { id: string; number: string; status: string; counter: string; slotStart: string; slotEnd: string; items: { name: string; qty: number }[] }
+type Filters = { search: string; status: string; from: string; to: string }
 
 const NEXT: Record<string, [string, string]> = {
   PAID: ['ACCEPTED', 'Accept'],
@@ -21,19 +22,32 @@ export default function Kitchen() {
   const router = useRouter()
   const [orders, setOrders] = useState<Order[]>([])
   const [error, setError] = useState('')
+  const [filters, setFilters] = useState<Filters>({ search: '', status: '', from: '', to: '' })
+  const [applied, setApplied] = useState<Filters>({ search: '', status: '', from: '', to: '' })
+  const [nextCursor, setNextCursor] = useState('')
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (cursor?: string, append = false) => {
     try {
-      const res = await fetch('/api/staff/orders')
+      const params = new URLSearchParams()
+      if (applied.search) params.set('search', applied.search)
+      if (applied.status) params.set('status', applied.status)
+      if (applied.from) params.set('from', applied.from)
+      if (applied.to) params.set('to', applied.to)
+      if (cursor) params.set('cursor', cursor)
+      const res = await fetch(`/api/staff/orders?${params}`)
       if (res.status === 401 || res.status === 403) return router.push('/login')
       const json = await res.json()
-      if (json.success) { setOrders(json.data); setError('') } else setError(json.error.message)
+      if (json.success) {
+        setOrders((current) => append ? [...current, ...json.data] : json.data)
+        setNextCursor(res.headers.get('X-Next-Cursor') ?? '')
+        setError('')
+      } else setError(json.error.message)
     } catch {
       setError('Offline - the board may be out of date.')
     }
-  }, [router])
+  }, [applied, router])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => { void load() }, [load])
   useLive(load)
 
   async function advance(id: string, status: string) {
@@ -58,6 +72,15 @@ export default function Kitchen() {
         <h1 className="text-xl font-semibold">Kitchen</h1>
         <button onClick={() => document.documentElement.requestFullscreen?.()} className="rounded-lg bg-stone-700 px-3 py-1.5 text-sm">Fullscreen</button>
       </header>
+      <form onSubmit={(event) => { event.preventDefault(); setOrders([]); setNextCursor(''); setApplied(filters) }} className="mb-4 grid gap-2 rounded-xl bg-stone-800 p-3 sm:grid-cols-2 lg:grid-cols-5">
+        <input value={filters.search} onChange={(event) => setFilters({ ...filters, search: event.target.value })} placeholder="Order number or student" aria-label="Search orders" className="rounded-lg bg-stone-700 px-3 py-2 text-sm" />
+        <select value={filters.status} onChange={(event) => setFilters({ ...filters, status: event.target.value })} aria-label="Filter by status" className="rounded-lg bg-stone-700 px-3 py-2 text-sm">
+          <option value="">Active statuses</option><option value="PAID">Paid</option><option value="ACCEPTED">Accepted</option><option value="PREPARING">Preparing</option><option value="READY">Ready</option>
+        </select>
+        <input type="date" value={filters.from} onChange={(event) => setFilters({ ...filters, from: event.target.value })} aria-label="From date" className="rounded-lg bg-stone-700 px-3 py-2 text-sm" />
+        <input type="date" value={filters.to} onChange={(event) => setFilters({ ...filters, to: event.target.value })} aria-label="To date" className="rounded-lg bg-stone-700 px-3 py-2 text-sm" />
+        <button className="rounded-lg bg-amber-500 px-3 py-2 text-sm font-semibold text-stone-900">Apply filters</button>
+      </form>
       {error && <p role="alert" className="mb-4 rounded-lg bg-red-900/60 px-3 py-2 text-sm">{error}</p>}
       {toMake.length > 0 && (
         <p className="mb-5 rounded-xl bg-stone-800 px-4 py-3 text-sm text-stone-300">
@@ -77,6 +100,11 @@ export default function Kitchen() {
                       <p className="font-semibold">{o.number.slice(-9)}</p>
                       <p className="text-xs text-stone-400">{clock(o.slotStart)} – {clock(o.slotEnd)}</p>
                     </div>
+                    {nextCursor && (
+                      <button onClick={() => void load(nextCursor, true)} className="mt-5 w-full rounded-xl bg-stone-700 px-4 py-3 text-sm font-medium">
+                        Load more orders
+                      </button>
+                    )}
                     <p className="text-xs text-stone-400">{o.counter}</p>
                     <ul className="my-3 text-sm">{o.items.map((i) => <li key={i.name}>{i.name} × {i.qty}</li>)}</ul>
                     {NEXT[o.status] && (

@@ -15,7 +15,7 @@ const schema = z.object({
 
 export async function POST(req: Request) {
   try {
-    limit(req, 'register', 5)
+    await limit(req, 'register', 5)
     const input = schema.parse(await req.json())
     const user = await prisma.user
       .create({

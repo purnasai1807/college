@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { prisma } from '@/lib/db'
 import { AppError, fail, ok } from '@/lib/http'
 import { requireSession } from '@/lib/auth/session'
+import { canteenForSession } from '@/lib/auth/canteen'
 
 const schema = z.object({
   name: z.string().trim().min(2).max(60).optional(),
@@ -18,8 +19,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   try {
     const admin = await requireSession('ADMIN', 'SUPER_ADMIN')
     const data = schema.parse(await req.json())
+    const canteenId = await canteenForSession(admin, new URL(req.url).searchParams.get('canteenId'))
     const { id } = await params
-    const food = await prisma.foodItem.update({ where: { id }, data })
+    const food = await prisma.foodItem.findFirst({ where: { id, canteenId }, select: { id: true } })
+    if (!food) throw new AppError('FOOD_NOT_FOUND', 'Food item could not be found.', 404)
+    await prisma.foodItem.update({ where: { id: food.id }, data })
     await prisma.auditLog.create({
       data: { userId: admin.userId, action: 'FOOD_UPDATED', resource: 'food', resourceId: food.id, metadata: data },
     })
@@ -32,9 +36,10 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const admin = await requireSession('ADMIN', 'SUPER_ADMIN')
+    const canteenId = await canteenForSession(admin, new URL(_req.url).searchParams.get('canteenId'))
     const { id } = await params
     await prisma.$transaction(async (tx) => {
-      const food = await tx.foodItem.findUnique({ where: { id }, select: { id: true } })
+      const food = await tx.foodItem.findFirst({ where: { id, canteenId }, select: { id: true } })
       if (!food) throw new AppError('FOOD_NOT_FOUND', 'Food item could not be found.', 404)
       const used = await tx.orderItem.findFirst({ where: { foodId: id }, select: { id: true } })
       if (used) throw new AppError('FOOD_HAS_ORDERS', 'This item has order history. Mark it unavailable instead of deleting it.', 409)
