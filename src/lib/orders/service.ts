@@ -28,7 +28,13 @@ async function nextOrderNumber(tx: Tx) {
 
 export async function createOrder(userId: string, input: NewOrder) {
   const wanted = new Map<string, number>()
-  for (const { foodId, qty } of input.items) wanted.set(foodId, (wanted.get(foodId) ?? 0) + qty)
+  for (const { foodId, qty } of input.items) {
+    const combined = (wanted.get(foodId) ?? 0) + qty
+    if (combined > 10) {
+      throw new AppError('INVALID_QUANTITY', 'You can order at most 10 of each item.', 400)
+    }
+    wanted.set(foodId, combined)
+  }
 
   return prisma.$transaction(async (tx) => {
     const canteen = await tx.canteen.findUnique({ where: { id: input.canteenId } })

@@ -136,4 +136,20 @@ describe.skipIf(!url)('student menu and order workflow', () => {
     expect(await prisma.pickupSlot.findUniqueOrThrow({ where: { id: slot.id } })).toMatchObject({ booked: 0 })
     expect(await prisma.order.count({ where: { canteenId: canteen.id } })).toBe(0)
   })
+
+  it('enforces the per-item quantity limit after combining duplicate cart lines', async () => {
+    const { prisma, canteen, counter, food, slot, user } = await setup(20)
+    const { createOrder } = await import('../src/lib/orders/service')
+
+    await expect(createOrder(user.id, {
+      canteenId: canteen.id,
+      counterId: counter.id,
+      slotId: slot.id,
+      items: [{ foodId: food.id, qty: 6 }, { foodId: food.id, qty: 5 }],
+    })).rejects.toMatchObject({ code: 'INVALID_QUANTITY' })
+
+    expect(await prisma.foodItem.findUniqueOrThrow({ where: { id: food.id } })).toMatchObject({ stock: 20, reserved: 0 })
+    expect(await prisma.pickupSlot.findUniqueOrThrow({ where: { id: slot.id } })).toMatchObject({ booked: 0 })
+    expect(await prisma.order.count({ where: { canteenId: canteen.id } })).toBe(0)
+  })
 })
