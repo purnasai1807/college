@@ -54,5 +54,8 @@
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
+  },
+  "overrides": {
+    "postcss": "$postcss"
   }
 }

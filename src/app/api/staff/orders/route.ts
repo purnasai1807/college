@@ -50,7 +50,7 @@ export async function GET(req: Request) {
           ],
         } : {}),
       },
-      orderBy: [{ slot: { startsAt: 'asc' } }, { createdAt: 'asc' }],
+      orderBy: [{ slot: { startsAt: 'asc' } }, { createdAt: 'asc' }, { id: 'asc' }],
       take: 101,
       ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
       include: { items: true, counter: true, slot: true },

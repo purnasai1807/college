@@ -22,8 +22,8 @@ jobs:
       DATABASE_URL: postgresql://canteen:canteen-test@localhost:5432/canteen_test
       TEST_DATABASE_URL: postgresql://canteen:canteen-test@localhost:5432/canteen_test
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm

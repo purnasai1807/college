@@ -81,9 +81,18 @@ The app uses INR/Asia-Kolkata conventions for canteen slots and payment currency
 
 ## Test and build
 
-- `npm test` runs the pickup-token and webhook-signature tests.
-- `TEST_DATABASE_URL=... npm run test -- tests/concurrency.test.ts` runs inventory and slot concurrency tests against a disposable PostgreSQL database. Never point it at production data.
+- `npm test` runs the pickup-token and webhook-signature tests; with `TEST_DATABASE_URL`, it also exercises PostgreSQL concurrency, tenant-isolation, and shared-rate-limit tests.
+- Point `TEST_DATABASE_URL` only at a disposable PostgreSQL database. Never run integration tests against production data.
 - `npm run lint` runs the strict TypeScript check.
 - `npm run build` generates Prisma Client and builds Next.js.
 
-Production rollout additionally requires verified live provider credentials/webhook delivery, HTTPS, managed PostgreSQL backups, database access controls, monitoring, correctly sized PostgreSQL connection pools, configured image storage (if uploads are needed), and operational acceptance testing with canteen staff. Live payment/refund and camera permissions cannot be exercised without the provider account, public HTTPS endpoint, and a browser/device.
+## Production launch checklist
+
+1. Provision managed PostgreSQL, enable encrypted connections and automated backups, and set its connection URL as `DATABASE_URL`.
+2. Configure the production app URL and a randomly generated `AUTH_SECRET` (at least 32 bytes), plus `ADMIN_EMAIL` and a unique `ADMIN_PASSWORD` (at least 12 characters) in the hosting provider's secret store.
+3. Deploy the app, apply migrations with `npm run db:migrate`, and run `npm run db:bootstrap` once to create the campus, canteen, main counter, and initial super-admin. Do not run the demo `npm run db:seed` in production.
+4. Test with Razorpay test keys first. For live checkout, complete the provider's account/KYC process, configure live keys as secrets, and register the production HTTPS endpoint `/api/payments/webhook` for `payment.captured` and `refund.processed`.
+5. If menu image uploads are required, configure the `IMAGE_STORAGE_*` secrets, public bucket URL, and bucket CORS policy. Otherwise uploads remain explicitly unavailable while menu image URLs still work.
+6. Configure monitoring/alerts, database pool capacity for open SSE connections, and retention policies. Have students, kitchen staff, and counter staff test the full order, cancellation/refund, and pickup flow before opening orders.
+
+Do not deploy live payments without valid provider credentials and a verified public HTTPS webhook. Live payment/refund processing and camera scanning require the corresponding provider account, deployed endpoint, and browser/device and cannot be tested by CI alone.

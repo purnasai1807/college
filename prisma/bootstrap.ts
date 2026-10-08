@@ -12,9 +12,19 @@ async function main() {
       END IF;
     END $$;`)
 
+  const campus = await prisma.campus.upsert({
+    where: { name_location: { name: process.env.CAMPUS_NAME || 'Default campus', location: process.env.CAMPUS_LOCATION || '' } },
+    create: { name: process.env.CAMPUS_NAME || 'Default campus', location: process.env.CAMPUS_LOCATION || '' },
+    update: {},
+  })
+
   if (!(await prisma.canteen.findFirst())) {
     const canteen = await prisma.canteen.create({
-      data: { name: process.env.CANTEEN_NAME || 'College Canteen', collegeName: process.env.COLLEGE_NAME || '' },
+      data: {
+        name: process.env.CANTEEN_NAME || 'College Canteen',
+        collegeName: process.env.COLLEGE_NAME || '',
+        campusId: campus.id,
+      },
     })
     await prisma.counter.create({ data: { name: 'Main Counter', canteenId: canteen.id } })
   }
@@ -23,7 +33,15 @@ async function main() {
   const password = process.env.ADMIN_PASSWORD
   if (email && password && !(await prisma.user.findFirst({ where: { role: 'SUPER_ADMIN' } }))) {
     if (password.length < 12) throw new Error('ADMIN_PASSWORD must be at least 12 characters.')
-    await prisma.user.create({ data: { email, name: 'Super Admin', role: 'SUPER_ADMIN', passwordHash: await bcrypt.hash(password, 12) } })
+    await prisma.user.create({
+      data: {
+        email,
+        name: 'Super Admin',
+        role: 'SUPER_ADMIN',
+        canteenId: (await prisma.canteen.findFirstOrThrow()).id,
+        passwordHash: await bcrypt.hash(password, 12),
+      },
+    })
     console.log(`Created the super admin account for ${email}`)
   }
 }

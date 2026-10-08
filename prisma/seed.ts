@@ -7,7 +7,15 @@ const prisma = new PrismaClient()
 const DEV_PASSWORD = 'Canteen#Dev123'
 
 async function main() {
-  const canteen = (await prisma.canteen.findFirst()) ?? (await prisma.canteen.create({ data: { name: 'College Canteen' } }))
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('The development seed contains demo accounts and cannot run in production.')
+  }
+  const campus = await prisma.campus.upsert({
+    where: { name_location: { name: 'Default campus', location: '' } },
+    create: { name: 'Default campus' },
+    update: {},
+  })
+  const canteen = (await prisma.canteen.findFirst()) ?? (await prisma.canteen.create({ data: { name: 'College Canteen', campusId: campus.id } }))
 
   if ((await prisma.counter.count()) === 0) {
     await prisma.counter.createMany({
@@ -56,8 +64,8 @@ async function main() {
   for (const [email, name, role, counterId, studentId] of users) {
     await prisma.user.upsert({
       where: { email },
-      update: {},
-      create: { email, name, role, counterId, studentId, passwordHash },
+      update: { canteenId: role === 'STUDENT' ? null : canteen.id, counterId },
+      create: { email, name, role, counterId, studentId, passwordHash, canteenId: role === 'STUDENT' ? null : canteen.id },
     })
   }
   console.log(`Seeded. Dev password for every account: ${DEV_PASSWORD}`)
