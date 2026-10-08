@@ -305,3 +305,5 @@ ALTER TABLE "Favorite" ADD CONSTRAINT "Favorite_foodId_fkey" FOREIGN KEY ("foodI
 
 -- AddForeignKey
 ALTER TABLE "PasswordReset" ADD CONSTRAINT "PasswordReset_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+ALTER TABLE "FoodItem" ADD CONSTRAINT stock_not_negative CHECK (stock >= 0 AND reserved >= 0 AND sold >= 0);

@@ -4,6 +4,23 @@ on: [push, pull_request]
 jobs:
   app:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: canteen
+          POSTGRES_PASSWORD: canteen-test
+          POSTGRES_DB: canteen_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U canteen -d canteen_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://canteen:canteen-test@localhost:5432/canteen_test
+      TEST_DATABASE_URL: postgresql://canteen:canteen-test@localhost:5432/canteen_test
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -11,6 +28,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - run: npx prisma migrate deploy
       - run: npm run lint
       - run: npm test
       - run: npm run build

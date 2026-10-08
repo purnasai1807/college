@@ -7,7 +7,14 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
   try {
     const admin = await requireSession('ADMIN', 'SUPER_ADMIN')
     const { id } = await params
-    const claimed = await prisma.refund.updateMany({ where: { id, status: 'FAILED' }, data: { status: 'PENDING' } })
+    const claimed = await prisma.$transaction(async (tx) => {
+      const result = await tx.refund.updateMany({ where: { id, status: 'FAILED' }, data: { status: 'PENDING' } })
+      if (result.count) {
+        const refund = await tx.refund.findUniqueOrThrow({ where: { id } })
+        await tx.payment.update({ where: { id: refund.paymentId }, data: { status: 'REFUND_PENDING' } })
+      }
+      return result
+    })
     if (claimed.count === 0) throw new AppError('NOT_RETRYABLE', 'Only a failed refund can be retried.', 409)
     await sendRefund(id)
     await prisma.auditLog.create({ data: { userId: admin.userId, action: 'REFUND_RETRIED', resource: 'refund', resourceId: id } })

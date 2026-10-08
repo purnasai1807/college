@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client'
 import { prisma } from '../db'
 import { AppError } from '../http'
 import { paymentProvider } from '../payments/provider'
@@ -41,21 +42,62 @@ export async function cancelOrder(userId: string, orderId: string) {
 export async function sendRefund(refundId: string) {
   const refund = await prisma.refund.findUniqueOrThrow({ where: { id: refundId }, include: { payment: true } })
   try {
-    const out = await paymentProvider.refundPayment(refund.payment.providerPaymentId!, refund.amountPaise)
+    if (!refund.payment.providerPaymentId) throw new Error('Refund has no captured provider payment.')
+    const out = await paymentProvider.refundPayment(refund.payment.providerPaymentId, refund.amountPaise)
     await prisma.refund.update({ where: { id: refund.id }, data: { status: 'PROCESSING', providerRefundId: out.providerRefundId } })
   } catch (e) {
     console.error('refund request failed', e)
-    await prisma.refund.update({ where: { id: refund.id }, data: { status: 'FAILED' } })
+    await prisma.$transaction([
+      prisma.refund.update({ where: { id: refund.id }, data: { status: 'FAILED' } }),
+      prisma.payment.update({ where: { id: refund.paymentId }, data: { status: 'REFUND_FAILED' } }),
+    ])
   }
 }
 
-export async function completeRefund(providerRefundId: string) {
+export async function completeRefund(input: {
+  eventId: string
+  eventType: string
+  providerRefundId: string
+  raw: unknown
+  succeeded: boolean
+}) {
   await prisma.$transaction(async (tx) => {
-    const refund = await tx.refund.findUnique({ where: { providerRefundId } })
-    if (!refund || refund.status === 'SUCCESS') return
-    await tx.refund.update({ where: { id: refund.id }, data: { status: 'SUCCESS' } })
-    await tx.payment.update({ where: { id: refund.paymentId }, data: { status: 'REFUNDED' } })
-    const order = await tx.order.update({ where: { id: refund.orderId }, data: { status: 'REFUNDED' } })
+    await tx.paymentEvent.create({
+      data: {
+        id: input.eventId,
+        type: input.eventType,
+        payload: input.raw as Prisma.InputJsonValue,
+      },
+    })
+    const refund = await tx.refund.findUnique({ where: { providerRefundId: input.providerRefundId } })
+    if (!refund) throw new AppError('REFUND_NOT_FOUND', 'Unknown provider refund.', 404)
+    if (refund.status === 'SUCCESS' || refund.status === 'FAILED') return
+
+    const nextStatus = input.succeeded ? 'SUCCESS' : 'FAILED'
+    const updated = await tx.refund.updateMany({
+      where: { id: refund.id, status: { in: ['PENDING', 'PROCESSING'] } },
+      data: { status: nextStatus },
+    })
+    if (updated.count === 0) return
+
+    await tx.payment.update({
+      where: { id: refund.paymentId },
+      data: { status: input.succeeded ? 'REFUNDED' : 'REFUND_FAILED' },
+    })
+    if (!input.succeeded) {
+      await tx.auditLog.create({
+        data: { action: 'REFUND_FAILED', resource: 'refund', resourceId: refund.id },
+      })
+      return
+    }
+
+    const order = await tx.order.update({
+      where: { id: refund.orderId },
+      data: { status: 'REFUNDED' },
+    })
+    await tx.auditLog.create({
+      data: { action: 'REFUND_COMPLETED', resource: 'refund', resourceId: refund.id },
+    })
     await tx.notification.create({
       data: { userId: order.userId, title: 'Refund completed', body: `Your refund for order ${order.number} has been processed.` },
     })

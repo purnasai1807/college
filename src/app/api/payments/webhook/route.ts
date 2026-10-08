@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import { paymentProvider } from '@/lib/payments/provider'
 import { confirmPayment, failPayment } from '@/lib/orders/service'
 import { completeRefund } from '@/lib/orders/refund'
+import { Prisma } from '@prisma/client'
 
 const reply = (status: number, code?: string) =>
   NextResponse.json(
@@ -40,12 +41,22 @@ export async function POST(req: Request) {
         raw: event,
       })
     }
-    if (event.event === 'refund.processed' && event.payload?.refund?.entity) {
-      await completeRefund(event.payload.refund.entity.id)
+    const refund = event.payload?.refund?.entity
+    if ((event.event === 'refund.processed' || event.event === 'refund.failed') && refund) {
+      await completeRefund({
+        eventId,
+        eventType: event.event,
+        providerRefundId: refund.id,
+        raw: event,
+        succeeded: event.event === 'refund.processed',
+      })
     }
     publish()
     return reply(200)
   } catch (e) {
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+      return reply(200)
+    }
     console.error('webhook failed', e)
     return reply(500, 'WEBHOOK_FAILED')
   }

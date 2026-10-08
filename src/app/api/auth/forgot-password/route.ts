@@ -20,6 +20,7 @@ export async function POST(req: Request) {
       })
       const link = `${process.env.NEXT_PUBLIC_APP_URL}/reset-password?token=${token}`
       await sendMail(user.email, 'Reset your canteen password', `Use this link within 30 minutes to choose a new password:\n\n${link}\n\nIf you did not ask for this, you can ignore this email.`)
+        .catch((error: unknown) => console.error('password reset email failed', error))
     }
     // same answer whether or not the account exists
     return ok({})

@@ -8,7 +8,7 @@ async function main() {
   await prisma.$executeRawUnsafe(`
     DO $$ BEGIN
       IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'stock_not_negative') THEN
-        ALTER TABLE "FoodItem" ADD CONSTRAINT stock_not_negative CHECK (stock >= 0 AND reserved >= 0);
+        ALTER TABLE "FoodItem" ADD CONSTRAINT stock_not_negative CHECK (stock >= 0 AND reserved >= 0 AND sold >= 0);
       END IF;
     END $$;`)
 
