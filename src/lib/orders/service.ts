@@ -130,7 +130,7 @@ type PaymentEventInput = {
 
 export async function confirmPayment(ev: PaymentEventInput) {
   try {
-    await prisma.$transaction(async (tx) => {
+    const refundId = await prisma.$transaction(async (tx) => {
       await tx.paymentEvent.create({
         data: { id: ev.eventId, type: ev.type, payload: ev.raw as Prisma.InputJsonValue },
       })
@@ -147,27 +147,56 @@ export async function confirmPayment(ev: PaymentEventInput) {
             metadata: { expected: payment.amountPaise, received: ev.amountPaise, currency: ev.currency },
           },
         })
-        return
+        return undefined
       }
-      if (payment.status === 'SUCCESS') return
-
-      await tx.payment.update({
-        where: { id: payment.id },
-        data: { status: 'SUCCESS', providerPaymentId: ev.providerPaymentId },
-      })
+      if (payment.status === 'SUCCESS' || payment.status === 'REFUNDED') return undefined
 
       const paid = await tx.order.updateMany({
         where: { id: payment.orderId, status: { in: [...OPEN_STATES] } },
         data: { status: 'PAID' },
       })
       if (paid.count === 0) {
-        // money arrived after the hold was released; reconciliation has to deal with it
+        const order = await tx.order.findUniqueOrThrow({ where: { id: payment.orderId } })
+        if (order.status === 'CANCELLED') {
+          const refundPending = await tx.order.updateMany({
+            where: { id: order.id, status: 'CANCELLED' },
+            data: { status: 'REFUND_PENDING' },
+          })
+          if (refundPending.count) {
+            await tx.payment.update({
+              where: { id: payment.id },
+              data: { status: 'REFUND_PENDING', providerPaymentId: ev.providerPaymentId },
+            })
+            const refund = await tx.refund.create({
+              data: { orderId: order.id, paymentId: payment.id, amountPaise: payment.amountPaise },
+            })
+            await tx.auditLog.create({
+              data: { action: 'LATE_PAYMENT_REFUND_STARTED', resource: 'order', resourceId: order.id },
+            })
+            await tx.notification.create({
+              data: {
+                userId: order.userId,
+                title: 'Late payment received',
+                body: `Payment for cancelled order ${order.number} arrived after the reservation expired. A refund has been started.`,
+              },
+            })
+            return refund.id
+          }
+        }
+        await tx.payment.update({
+          where: { id: payment.id },
+          data: { status: 'SUCCESS', providerPaymentId: ev.providerPaymentId },
+        })
         await tx.auditLog.create({
           data: { action: 'PAYMENT_ON_CLOSED_ORDER', resource: 'payment', resourceId: payment.id },
         })
-        return
+        return undefined
       }
 
+      await tx.payment.update({
+        where: { id: payment.id },
+        data: { status: 'SUCCESS', providerPaymentId: ev.providerPaymentId },
+      })
       const order = await tx.order.findUniqueOrThrow({
         where: { id: payment.orderId },
         include: { items: true },
@@ -186,7 +215,9 @@ export async function confirmPayment(ev: PaymentEventInput) {
           body: `Order ${order.number} is confirmed. Your pickup QR is ready.`,
         },
       })
+      return undefined
     })
+    if (refundId) return { refundId }
   } catch (e) {
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') return 'duplicate'
     throw e

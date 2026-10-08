@@ -2,7 +2,7 @@ import { publish } from '@/lib/realtime'
 import { NextResponse } from 'next/server'
 import { paymentProvider } from '@/lib/payments/provider'
 import { confirmPayment, failPayment } from '@/lib/orders/service'
-import { completeRefund } from '@/lib/orders/refund'
+import { completeRefund, sendRefund } from '@/lib/orders/refund'
 import { Prisma } from '@prisma/client'
 
 const reply = (status: number, code?: string) =>
@@ -23,7 +23,7 @@ export async function POST(req: Request) {
     const event = JSON.parse(raw)
     const p = event.payload?.payment?.entity
     if (event.event === 'payment.captured' && p) {
-      await confirmPayment({
+      const confirmation = await confirmPayment({
         eventId,
         type: event.event,
         providerOrderId: p.order_id,
@@ -32,6 +32,9 @@ export async function POST(req: Request) {
         currency: p.currency,
         raw: event,
       })
+      if (confirmation && typeof confirmation === 'object' && 'refundId' in confirmation) {
+        await sendRefund(confirmation.refundId)
+      }
     }
     if (event.event === 'payment.failed' && p) {
       await failPayment({
