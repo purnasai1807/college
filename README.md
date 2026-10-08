@@ -30,6 +30,8 @@ Requirements: Node.js 20+, npm, and PostgreSQL 14+.
 4. Create the initial canteen and, if configured, the first super-admin: `npm run db:bootstrap`.
 5. Start Next.js: `npm run dev`.
 
+The optional demo seed creates fictional menu items and test accounts. It is disabled by default and cannot run when `NODE_ENV=production`. To seed a disposable local development database only, set `ALLOW_DEMO_SEED=true` and provide a unique `DEMO_SEED_PASSWORD` of at least 12 characters before running `npm run db:seed`. Do not use demo records as real student, menu, payment, or order data.
+
 For Docker, set `DB_PASSWORD` and `AUTH_SECRET` in `.env`, then run `docker compose up --build`. Compose starts PostgreSQL, waits for its health check, applies committed Prisma migrations, bootstraps the first canteen/admin, and starts the app on port 3000.
 
 ### First administrator
@@ -99,6 +101,6 @@ The app uses INR/Asia-Kolkata conventions for canteen slots and payment currency
 5. If menu image uploads are required, configure the `IMAGE_STORAGE_*` secrets, public bucket URL, and bucket CORS policy. Otherwise uploads remain explicitly unavailable while menu image URLs still work.
 6. Configure monitoring/alerts, database pool capacity for open SSE connections, and retention policies. Have students, kitchen staff, and counter staff test the full order, cancellation/refund, and pickup flow before opening orders.
 
-Order records are not automatically deleted by the application. Authorized canteen admins can search orders from the previous 72 hours by exact roll number or partial student name. Keep database backups and access controls configured by the hosting provider as additional disaster recovery; the in-app search window is not a replacement for backups.
+Order recovery uses each order's actual database `createdAt` timestamp and includes orders from the preceding 72 hours; the app does not fabricate order dates or automatically delete order records. Authorized canteen admins can search this window by exact roll number or partial student name. This is a live database lookup, not a backup or restoration service: configure managed PostgreSQL backups and test restores with the hosting provider for protection against database loss.
 
 Do not deploy live payments without valid provider credentials and a verified public HTTPS webhook. Live payment/refund processing and camera scanning require the corresponding provider account, deployed endpoint, and browser/device and cannot be tested by CI alone.

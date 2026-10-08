@@ -3,12 +3,16 @@ import bcrypt from 'bcryptjs'
 
 const prisma = new PrismaClient()
 
-// development logins only - never create these in production
-const DEV_PASSWORD = 'Canteen#Dev123'
-
 async function main() {
   if (process.env.NODE_ENV === 'production') {
     throw new Error('The development seed contains demo accounts and cannot run in production.')
+  }
+  if (process.env.ALLOW_DEMO_SEED !== 'true') {
+    throw new Error('Demo data is disabled. Set ALLOW_DEMO_SEED=true only for a disposable local development database.')
+  }
+  const devPassword = process.env.DEMO_SEED_PASSWORD
+  if (!devPassword || devPassword.length < 12) {
+    throw new Error('Set DEMO_SEED_PASSWORD to a unique password of at least 12 characters.')
   }
   const campus = await prisma.campus.upsert({
     where: { name_location: { name: 'Default campus', location: '' } },
@@ -53,7 +57,7 @@ async function main() {
     })),
   })
 
-  const passwordHash = await bcrypt.hash(DEV_PASSWORD, 10)
+  const passwordHash = await bcrypt.hash(devPassword, 12)
   const users: [string, string, Role, string | null, string | null][] = [
     ['super@canteen.local', 'Super Admin', 'SUPER_ADMIN', null, null],
     ['admin@canteen.local', 'Canteen Admin', 'ADMIN', null, null],
@@ -68,7 +72,7 @@ async function main() {
       create: { email, name, role, counterId, studentId, passwordHash, canteenId: role === 'STUDENT' ? null : canteen.id },
     })
   }
-  console.log(`Seeded. Dev password for every account: ${DEV_PASSWORD}`)
+  console.log('Development demo data seeded. Demo account password was not printed.')
 }
 
 main().finally(() => prisma.$disconnect())
