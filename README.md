@@ -24,7 +24,7 @@ The UI is intentionally straightforward and mobile-first. It is an operational a
 
 Requirements: Node.js 20+, npm, and PostgreSQL 14+.
 
-1. Copy `.env.example` to `.env`; set `DATABASE_URL`, a random `AUTH_SECRET`, and the application URL.
+1. Copy `.env.example` to `.env.local`; set `DATABASE_URL`, a random `AUTH_SECRET`, the `NEXT_PUBLIC_APP_URL`, and Razorpay test credentials.
 2. Install packages: `npm install`.
 3. Create/update the database schema: `npm run db:push`.
 4. Create the initial ACE Engineering College canteen and, if configured, the first super-admin: `npm run db:bootstrap`. Override `CAMPUS_NAME`, `CANTEEN_NAME`, or `COLLEGE_NAME` for a different installation.
@@ -40,15 +40,32 @@ Set `ADMIN_EMAIL` and an `ADMIN_PASSWORD` of at least 12 characters before the f
 
 ## UPI payments and webhooks
 
-The integration uses Razorpay's Orders API and hosted checkout; the browser only opens checkout and cannot mark an order paid. The backend validates Razorpay's webhook signature, event ID, provider order ID, amount, and currency before changing payment/order state and issuing the pickup QR. Missing provider credentials or malformed Razorpay order/refund responses are rejected rather than creating an unusable checkout.
+The integration uses Razorpay's Orders API and hosted checkout, configured to show only the UPI QR flow. Students scan the QR shown in Razorpay Checkout with a UPI app. The browser only opens checkout and cannot mark an order paid; its success callback only returns the student to order tracking. The backend validates Razorpay's signed `payment.captured` webhook, event ID, provider order ID, amount, and currency before changing payment/order state and issuing the separate pickup QR. Order tracking refreshes automatically while payment is pending. Missing provider credentials or malformed Razorpay order/refund responses are rejected rather than creating an unusable checkout.
 
 1. Create a Razorpay account and use **test keys** while developing.
-2. Set `PAYMENT_PROVIDER_KEY`, `PAYMENT_PROVIDER_SECRET`, and `PAYMENT_WEBHOOK_SECRET` in `.env` or the deployment secret store.
+2. For local development, put `PAYMENT_PROVIDER_KEY`, `PAYMENT_PROVIDER_SECRET`, and `PAYMENT_WEBHOOK_SECRET` in the root `.env.local` file (same folder as `package.json`). Use Razorpay **Test Mode** Key ID and Key Secret for the first two variables. Keep the secret out of `NEXT_PUBLIC_*` variables and never send it to the browser.
 3. Configure a publicly reachable HTTPS webhook at `/api/payments/webhook` for `payment.captured` and `refund.processed`, using the same webhook secret.
 4. Use Razorpay's test UPI methods and verify captured payments through the webhook. A local webhook can be forwarded with a secure development tunnel.
 5. Before accepting real payments, configure live credentials, HTTPS, the production webhook, account settlement, and refund policies in the provider dashboard.
 
 Do not put provider secrets in `NEXT_PUBLIC_*` variables or the browser. Checkout availability is not proof of payment: the signed provider webhook is authoritative. If a payment arrives after an order hold expires, it is recorded and flagged for reconciliation rather than silently restoring the cancelled order.
+
+### Add Razorpay keys in Vercel
+
+In Vercel, open the **college** project → **Settings** → **Environment Variables** and add these names exactly. Use Test Mode values for Preview while validating; use Live Mode values only for Production after Razorpay enables the merchant account and UPI QR payments.
+
+| Vercel variable | Value to enter |
+| --- | --- |
+| `PAYMENT_PROVIDER_KEY` | Razorpay Key ID (`rzp_test_...` for test or `rzp_live_...` for production); this public identifier is passed to Checkout |
+| `PAYMENT_PROVIDER_SECRET` | Razorpay Key Secret; server-only, never expose it in client/public variables |
+| `PAYMENT_WEBHOOK_SECRET` | The webhook secret chosen when registering `/api/payments/webhook` in Razorpay Dashboard; it is distinct from the API Key Secret |
+| `DATABASE_URL` | PostgreSQL connection URL for this deployment |
+| `AUTH_SECRET` | A unique random value of at least 32 bytes |
+| `NEXT_PUBLIC_APP_URL` | The deployed site origin, for example `https://college-lovat.vercel.app` |
+| `ADMIN_EMAIL` | Email for the first super-admin bootstrap |
+| `ADMIN_PASSWORD` | Unique first-admin password of at least 12 characters |
+
+Select the intended Vercel environments for each variable, save them, and redeploy only after all required values and the database are provisioned. In Razorpay Dashboard, enable UPI QR for the account and register the HTTPS webhook URL `https://<your-domain>/api/payments/webhook` for `payment.captured` and `refund.processed`; copy that endpoint's webhook secret to `PAYMENT_WEBHOOK_SECRET`. Never paste the Key Secret or webhook secret into chat or source control.
 
 ## Database and account setup
 

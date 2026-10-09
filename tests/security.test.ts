@@ -2,6 +2,7 @@ import { createHmac } from 'crypto'
 import { afterEach, describe, expect, it } from 'vitest'
 import { newNonce, parseToken, tokenFor } from '../src/lib/qr'
 import { paymentProvider } from '../src/lib/payments/provider'
+import { checkoutOptions } from '../src/lib/client/razorpay'
 
 process.env.AUTH_SECRET = 'test-secret'
 process.env.PAYMENT_WEBHOOK_SECRET = 'whsec_test'
@@ -52,6 +53,22 @@ describe('webhook signature', () => {
       else delete process.env.PAYMENT_PROVIDER_KEY
       if (configured.secret) process.env.PAYMENT_PROVIDER_SECRET = configured.secret
       else delete process.env.PAYMENT_PROVIDER_SECRET
+    })
+
+    describe('Razorpay UPI QR checkout configuration', () => {
+      it('offers only UPI QR and never treats a browser callback as payment confirmation', () => {
+        const onClose = () => {}
+        const options = checkoutOptions({
+          key: 'rzp_test_public',
+          orderId: 'order_test_1',
+          amountPaise: 2500,
+          onClose,
+        })
+        expect(options.config.display.blocks.upi.instruments).toEqual([{ method: 'upi', flows: ['qr'] }])
+        expect(options.config.display.preferences.show_default_blocks).toBe(false)
+        expect(options.handler).toBe(onClose)
+        expect(options.modal.ondismiss).toBe(onClose)
+      })
     })
 
     it('sends a server-priced INR order and returns the configured checkout key', async () => {

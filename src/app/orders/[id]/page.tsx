@@ -107,14 +107,14 @@ export default function OrderPage() {
 
         {order.status === 'PAYMENT_PENDING' && (
           <div className="mt-5 rounded-2xl bg-amber-50 p-4 text-sm text-amber-900">
-            <p className="font-medium">Waiting for payment confirmation</p>
-            <p className="mt-1 text-amber-800">If you already paid, hold on while we verify it. Please don’t pay twice.</p>
+            <p className="font-medium">Waiting for Razorpay payment confirmation</p>
+            <p className="mt-1 text-amber-800">Scan the UPI QR in checkout. This order changes to confirmed only after Razorpay verifies the payment; if you already paid, please wait and don’t pay twice.</p>
             {order.checkout && (
               <button
                 onClick={() => openCheckout({ key: order.checkout!.publicKey, orderId: order.checkout!.providerOrderId, amountPaise: order.totalPaise, onClose: load })}
                 className="mt-3 rounded-xl bg-amber-500 px-4 py-2 font-semibold text-white"
               >
-                Pay {inr(order.totalPaise)}
+                Show UPI QR · {inr(order.totalPaise)}
               </button>
             )}
           </div>

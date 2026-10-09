@@ -315,8 +315,11 @@ export default function Home() {
               <span>Total</span><span>{inr(total)}</span>
             </div>
             <button disabled={!ready || paying} onClick={pay} className="w-full rounded-xl bg-amber-500 py-3.5 text-sm font-semibold text-white transition hover:bg-amber-600 disabled:opacity-50">
-              {paying ? 'Opening payment…' : 'Pay with UPI'}
+              {paying ? 'Opening UPI QR…' : 'Pay by UPI QR'}
             </button>
+            <p className="mt-2 text-center text-xs text-stone-500">
+              Scan the Razorpay QR with your UPI app. We confirm the order after Razorpay verifies payment.
+            </p>
             {!counterId || !slotId ? <p className="mt-2 text-center text-xs text-stone-500">Choose a counter and a pickup time to continue.</p> : null}
           </div>
         </div>
