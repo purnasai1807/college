@@ -27,7 +27,7 @@ Requirements: Node.js 20+, npm, and PostgreSQL 14+.
 1. Copy `.env.example` to `.env`; set `DATABASE_URL`, a random `AUTH_SECRET`, and the application URL.
 2. Install packages: `npm install`.
 3. Create/update the database schema: `npm run db:push`.
-4. Create the initial canteen and, if configured, the first super-admin: `npm run db:bootstrap`.
+4. Create the initial ACE Engineering College canteen and, if configured, the first super-admin: `npm run db:bootstrap`. Override `CAMPUS_NAME`, `CANTEEN_NAME`, or `COLLEGE_NAME` for a different installation.
 5. Start Next.js: `npm run dev`.
 
 The optional demo seed creates fictional menu items and test accounts. It is disabled by default and cannot run when `NODE_ENV=production`. To seed a disposable local development database only, set `ALLOW_DEMO_SEED=true` and provide a unique `DEMO_SEED_PASSWORD` of at least 12 characters before running `npm run db:seed`. Do not use demo records as real student, menu, payment, or order data.
@@ -40,7 +40,7 @@ Set `ADMIN_EMAIL` and an `ADMIN_PASSWORD` of at least 12 characters before the f
 
 ## UPI payments and webhooks
 
-The integration uses Razorpay's Orders API and hosted checkout; the browser only opens checkout and cannot mark an order paid. The backend validates Razorpay's webhook signature, event ID, provider order ID, amount, and currency before changing payment/order state and issuing the pickup QR.
+The integration uses Razorpay's Orders API and hosted checkout; the browser only opens checkout and cannot mark an order paid. The backend validates Razorpay's webhook signature, event ID, provider order ID, amount, and currency before changing payment/order state and issuing the pickup QR. Missing provider credentials or malformed Razorpay order/refund responses are rejected rather than creating an unusable checkout.
 
 1. Create a Razorpay account and use **test keys** while developing.
 2. Set `PAYMENT_PROVIDER_KEY`, `PAYMENT_PROVIDER_SECRET`, and `PAYMENT_WEBHOOK_SECRET` in `.env` or the deployment secret store.
@@ -79,7 +79,7 @@ API route handlers live under `src/app/api`. Important flows include `/api/order
 See `.env.example` for the full variable list. Required for a deployed application:
 
 - `DATABASE_URL`, `AUTH_SECRET`, `NEXT_PUBLIC_APP_URL`
-- `PAYMENT_PROVIDER_KEY`, `PAYMENT_PROVIDER_SECRET`, `PAYMENT_WEBHOOK_SECRET` for payment checkout
+- `PAYMENT_PROVIDER_KEY`, `PAYMENT_PROVIDER_SECRET`, `PAYMENT_WEBHOOK_SECRET` for Razorpay UPI checkout
 - `ADMIN_EMAIL` and `ADMIN_PASSWORD` for first-run administrator provisioning
 - `DB_PASSWORD` for the provided Docker Compose PostgreSQL service
 

@@ -13,16 +13,16 @@ async function main() {
     END $$;`)
 
   const campus = await prisma.campus.upsert({
-    where: { name_location: { name: process.env.CAMPUS_NAME || 'Default campus', location: process.env.CAMPUS_LOCATION || '' } },
-    create: { name: process.env.CAMPUS_NAME || 'Default campus', location: process.env.CAMPUS_LOCATION || '' },
+    where: { name_location: { name: process.env.CAMPUS_NAME || 'ACE Engineering College', location: process.env.CAMPUS_LOCATION || '' } },
+    create: { name: process.env.CAMPUS_NAME || 'ACE Engineering College', location: process.env.CAMPUS_LOCATION || '' },
     update: {},
   })
 
   if (!(await prisma.canteen.findFirst())) {
     const canteen = await prisma.canteen.create({
       data: {
-        name: process.env.CANTEEN_NAME || 'College Canteen',
-        collegeName: process.env.COLLEGE_NAME || '',
+        name: process.env.CANTEEN_NAME || 'ACE Engineering College Canteen',
+        collegeName: process.env.COLLEGE_NAME || 'ACE Engineering College',
         campusId: campus.id,
       },
     })

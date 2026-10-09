@@ -1,6 +1,6 @@
 import './globals.css'
 
-export const metadata = { title: 'College Canteen', description: 'Order ahead, pay by UPI, skip the queue.' }
+export const metadata = { title: 'ACE Engineering College Canteen', description: 'Order ahead, pay by UPI, skip the queue.' }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

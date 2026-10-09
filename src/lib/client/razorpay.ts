@@ -31,7 +31,7 @@ export async function openCheckout({ key, orderId, amountPaise, onClose }: Check
     order_id: orderId,
     amount: amountPaise,
     currency: 'INR',
-    name: 'College Canteen',
+    name: 'ACE Engineering College Canteen',
     theme: { color: '#d97706' },
     handler: onClose,
     modal: { ondismiss: onClose },

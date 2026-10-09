@@ -32,7 +32,12 @@ export async function GET(req: Request) {
     ])
 
     return ok({
-      canteen: { id: canteen.id, name: canteen.name, collegeName: canteen.collegeName, isOpen: canteen.isOpen && withinHours(canteen) },
+      canteen: {
+        id: canteen.id,
+        name: canteen.name,
+        collegeName: canteen.collegeName || 'ACE Engineering College',
+        isOpen: canteen.isOpen && withinHours(canteen),
+      },
       counters,
       foods: foods.map((f) => ({
         id: f.id,
