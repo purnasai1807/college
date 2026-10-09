@@ -59,6 +59,7 @@ export default function LoginPage() {
       </form>
 
       <a href="/forgot-password" className="mt-4 text-sm text-stone-500 hover:text-stone-800">Forgot your password?</a>
+      <a href="/admin/login" className="mt-3 text-sm text-stone-500 hover:text-stone-800">Canteen admin sign in</a>
 
       <button onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setError('') }} className="mt-5 text-sm text-stone-500 hover:text-stone-800">
         {mode === 'login' ? 'New here? Create an account' : 'Already registered? Sign in'}

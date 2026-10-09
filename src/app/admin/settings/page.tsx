@@ -15,7 +15,7 @@ export default function SettingsPage() {
   useEffect(() => {
     const canteenId = new URLSearchParams(window.location.search).get('canteenId') ?? ''
     fetch(adminUrl('/api/admin/settings', canteenId)).then(async (res) => {
-      if (res.status === 401 || res.status === 403) return router.push('/login')
+      if (res.status === 401 || res.status === 403) return router.push('/admin/login')
       const json = await res.json()
       if (json.success) setS(json.data)
     })

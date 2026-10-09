@@ -39,7 +39,7 @@ export default function Reports() {
     const canteenId = new URLSearchParams(window.location.search).get('canteenId') ?? ''
     fetch(adminUrl(`/api/admin/reports/items?days=${days}`, canteenId))
       .then(async (res) => {
-        if (res.status === 401 || res.status === 403) return router.push('/login')
+        if (res.status === 401 || res.status === 403) return router.push('/admin/login')
         const json = await res.json()
         json.success ? setData(json.data) : setError(json.error.message)
       })

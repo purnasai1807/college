@@ -38,7 +38,7 @@ export default function Admin() {
     if (!contextReady) return
     try {
       const res = await fetch(adminUrl('/api/admin/summary', canteenId))
-      if (res.status === 401 || res.status === 403) return router.push('/login')
+      if (res.status === 401 || res.status === 403) return router.push('/admin/login')
       const json = await res.json()
       json.success ? setData(json.data) : setError(json.error.message)
     } catch {
