@@ -10,6 +10,7 @@
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate deploy",
     "db:bootstrap": "tsx prisma/bootstrap.ts",
+    "db:reset-admin-password": "tsx prisma/reset-admin-password.ts",
     "db:seed": "tsx prisma/seed.ts",
     "test": "vitest run tests/security.test.ts tests/concurrency.test.ts tests/tenant.test.ts tests/rate-limit.test.ts tests/feedback.test.ts tests/order-recovery.test.ts tests/auth.test.ts tests/order-workflow.test.ts"
   },
