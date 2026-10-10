@@ -73,7 +73,7 @@ export default function AdminLoginPage() {
         </button>
       </form>
 
-      <a href="/forgot-password" className="mt-4 text-sm text-stone-500 hover:text-stone-800">Forgot password?</a>
+      <a href="/admin/forgot-password" className="mt-4 text-sm text-stone-500 hover:text-stone-800">Forgot admin password?</a>
       <a href="/login" className="mt-5 text-sm text-stone-500 hover:text-stone-800">Student and staff sign in</a>
     </main>
   )

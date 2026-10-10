@@ -3,9 +3,26 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { newNonce, parseToken, tokenFor } from '../src/lib/qr'
 import { paymentProvider } from '../src/lib/payments/provider'
 import { checkoutOptions } from '../src/lib/client/razorpay'
+import { createAdminResetOtp, hashAdminResetOtp, verifyAdminResetOtpHash } from '../src/lib/auth/admin-reset-otp'
 
-process.env.AUTH_SECRET = 'test-secret'
+process.env.AUTH_SECRET = 'test-secret-that-is-at-least-32-bytes-long'
 process.env.PAYMENT_WEBHOOK_SECRET = 'whsec_test'
+
+describe('admin password reset OTP', () => {
+  it('creates a six-digit code and verifies its keyed hash for the registered email', () => {
+    const otp = createAdminResetOtp()
+    const hash = hashAdminResetOtp('Admin@Example.com', otp)
+    expect(otp).toMatch(/^\d{6}$/)
+    expect(verifyAdminResetOtpHash(hash, 'admin@example.com', otp)).toBe(true)
+  })
+
+  it('rejects a code used with another email or malformed code/hash', () => {
+    const hash = hashAdminResetOtp('admin@example.com', '123456')
+    expect(verifyAdminResetOtpHash(hash, 'other@example.com', '123456')).toBe(false)
+    expect(verifyAdminResetOtpHash(hash, 'admin@example.com', '12345')).toBe(false)
+    expect(verifyAdminResetOtpHash('invalid', 'admin@example.com', '123456')).toBe(false)
+  })
+})
 
 describe('pickup tokens', () => {
   it('round-trips a valid token', () => {

@@ -13,7 +13,7 @@ export async function POST(req: Request) {
     }
     const { email } = z.object({ email: z.string().trim().toLowerCase().email() }).parse(await req.json())
     const user = await prisma.user.findUnique({ where: { email } })
-    if (user) {
+    if (user && user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') {
       const token = randomBytes(32).toString('hex')
       await prisma.passwordReset.create({
         data: { userId: user.id, tokenHash: createHash('sha256').update(token).digest('hex'), expiresAt: new Date(Date.now() + 30 * 60_000) },

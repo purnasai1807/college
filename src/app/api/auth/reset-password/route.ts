@@ -11,8 +11,11 @@ export async function POST(req: Request) {
   try {
     await limit(req, 'reset', 10)
     const { token, password } = schema.parse(await req.json())
-    const reset = await prisma.passwordReset.findUnique({ where: { tokenHash: createHash('sha256').update(token).digest('hex') } })
-    if (!reset || reset.usedAt || reset.expiresAt < new Date()) {
+    const reset = await prisma.passwordReset.findUnique({
+      where: { tokenHash: createHash('sha256').update(token).digest('hex') },
+      include: { user: { select: { role: true } } },
+    })
+    if (!reset || reset.usedAt || reset.expiresAt < new Date() || reset.user.role === 'ADMIN' || reset.user.role === 'SUPER_ADMIN') {
       throw new AppError('INVALID_RESET', 'This reset link is invalid or has expired. Please ask for a new one.', 400)
     }
     const passwordHash = await bcrypt.hash(password, 12)

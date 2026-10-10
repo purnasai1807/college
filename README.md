@@ -64,8 +64,10 @@ In Vercel, open the **college** project → **Settings** → **Environment Varia
 | `DATABASE_URL` | PostgreSQL connection URL for this deployment |
 | `AUTH_SECRET` | A unique random value of at least 32 bytes |
 | `NEXT_PUBLIC_APP_URL` | The deployed site origin, for example `https://college-lovat.vercel.app` |
-| `ADMIN_EMAIL` | Email for the first super-admin bootstrap |
+| `ADMIN_EMAIL` | Registered email for the first super-admin bootstrap and admin password recovery |
 | `ADMIN_PASSWORD` | Unique first-admin password of at least 12 characters |
+| `RESEND_API_KEY` | Resend API key used to email password-reset links/codes |
+| `MAIL_FROM` | Sender address verified with Resend |
 
 Select the intended Vercel environments for each variable, save them, and redeploy only after all required values and the database are provisioned. In Razorpay Dashboard, enable UPI QR for the account and register the HTTPS webhook URL `https://<your-domain>/api/payments/webhook` for `payment.captured` and `refund.processed`; copy that endpoint's webhook secret to `PAYMENT_WEBHOOK_SECRET`. Never paste the Key Secret or webhook secret into chat or source control.
 
@@ -75,7 +77,7 @@ Select the intended Vercel environments for each variable, save them, and redepl
 
 Rate limiting and realtime invalidation use PostgreSQL so separate app instances share the same state. Realtime delivery polls the shared event table while an SSE connection is open; keep the database connection pool sized for the expected number of concurrent streams. Food image upload is optional and uses an S3-compatible bucket: configure the `IMAGE_STORAGE_*` variables, allow browser POST uploads from the app origin in the bucket CORS policy, and serve uploaded keys from `IMAGE_STORAGE_PUBLIC_URL`. For AWS, prefer the deployment's workload identity rather than static access keys. Uploads are restricted to JPEG, PNG, and WebP files up to 5 MB.
 
-Optional email-based password-reset links use Resend: set `RESEND_API_KEY` and `MAIL_FROM`. Without an email provider, the application reports that reset email is unavailable; reset links are not exposed as successful email delivery.
+Student password-reset links and admin one-time codes use Resend: set `RESEND_API_KEY` and a verified-sender `MAIL_FROM` in the deployment environment. Admins use `/admin/forgot-password`; a 6-digit code is sent only to an existing admin account's registered email, expires in 10 minutes, is stored as a keyed hash, and can only be used once. Requests and verification attempts are rate-limited. Admin accounts cannot use the student reset-link endpoints. In Vercel, configure `RESEND_API_KEY` and `MAIL_FROM` under the `college` project's Environment Variables, for Production, then redeploy. Verify the sender/domain with Resend first. Until these are configured, the app reports that admin email recovery is unavailable rather than claiming an email was sent.
 
 ## Main screens and APIs
 
